@@ -1,16 +1,8 @@
 use actix_web::{App, HttpResponse, HttpServer, Responder, get};
-use serde::Serialize;
-
-#[derive(Serialize)]
-struct HealthResponse {
-    status: String,
-}
 
 #[get("/health")]
 async fn health() -> impl Responder {
-    HttpResponse::Ok().json(HealthResponse {
-        status: "ok".to_string(),
-    })
+    HttpResponse::Ok()
 }
 
 #[actix_web::main]
