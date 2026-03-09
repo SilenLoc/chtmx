@@ -1,4 +1,10 @@
-use actix_web::{App, HttpResponse, HttpServer, Responder, get};
+use actix_web::{App, HttpResponse, HttpServer, Responder, get, web};
+use env_logger::Env;
+use log::info;
+
+mod assets;
+mod config;
+mod index;
 
 #[get("/health")]
 async fn health() -> impl Responder {
@@ -7,17 +13,21 @@ async fn health() -> impl Responder {
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    env_logger::init_from_env(env_logger::Env::new().default_filter_or("info"));
+    let config = config::from_env();
 
-    let port = std::env::var("PORT")
-        .unwrap_or_else(|_| "8080".to_string())
-        .parse::<u16>()
-        .expect("PORT must be a valid number");
+    env_logger::Builder::from_env(Env::default().default_filter_or(config.log_level())).init();
 
-    log::info!("Starting server on http://0.0.0.0:{}", port);
+    info!("{config}");
 
-    HttpServer::new(|| App::new().service(health))
-        .bind(("0.0.0.0", port))?
-        .run()
-        .await
+    let bind_address = config.address();
+
+    HttpServer::new(|| {
+        App::new()
+            .service(health)
+            .service(assets::assets)
+            .route("/", web::get().to(index::index))
+    })
+    .bind(bind_address)?
+    .run()
+    .await
 }
