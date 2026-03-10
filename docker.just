@@ -1,11 +1,17 @@
 image_name := "silenloc/chtmx"
 
-@run d="-d": build stop
-    docker run {{d}} --name chtmx -p 8080:8080 {{image_name}}
+@run d="-d": build compose-down
+    docker compose up {{d}}
 
 @stop:
-    -docker stop chtmx
-    -docker rm chtmx
+    -docker compose down
+
+compose-down:
+    -docker compose down
+
+# Start only the clickhouse database
+@db:
+    docker compose up -d clickhouse
 
 build version="latest":
     docker build -t {{image_name}}:{{version}} .

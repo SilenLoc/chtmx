@@ -4,6 +4,7 @@ always use just command to verify etc
 You find documentation on how to to do:
 - styling for the html inside skills/t.md
 - for htmx inside skills/t.md
+- for clickhouse look at clickhouse-*.md
 
 
 This file contains essential commands and code-style guidance for autonomous agents working in this repository.

@@ -14,7 +14,14 @@ pub async fn index() -> impl Responder {
             }
             body class="sans-serif pa4" {
                 div class="mw7 center" {
-                    h1 class="f2 mb3" { "Welcome to CHTMX" }
+                    div class="mb3 flex items-center justify-between" {
+                        h1 class="f2 mb0" { "Welcome to CHTMX" }
+                        div hx-get="/health/db/status"
+                            hx-trigger="load"
+                            hx-swap="innerHTML" {
+                            span class="gray f6" { "Loading..." }
+                        }
+                    }
                     p class="f4 lh-copy" {
                         "This is a simple HTMX application using Tachyons CSS and Maud templates."
                     }
