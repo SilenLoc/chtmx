@@ -53,8 +53,10 @@ pub fn render_layout(main_content: &maud::Markup) -> maud::Markup {
                 div class="fixed top-0 left-0 right-0 bottom-0 cover bg-center" style="background-image: url(/assets/background.jpg); z-index: -1;" {
                     div class="bg-black-10 h-100" {}
                 }
-                main id="feature" class="tc ph3 pv4" style="height: calc(100vh - 4rem); overflow-y: auto;" {
-                    (main_content)
+                main id="feature" class="tc ph3 pv4 flex items-center justify-center" style="height: calc(100vh - 4rem); overflow-y: auto;" {
+                    div class="w-100" {
+                        (main_content)
+                    }
                 }
             }
         }
