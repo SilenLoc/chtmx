@@ -5,7 +5,7 @@ use log::info;
 mod assets;
 mod config;
 mod db;
-mod index;
+mod view;
 
 #[get("/health")]
 async fn health() -> impl Responder {
@@ -36,7 +36,7 @@ async fn health_db_status(ch: web::Data<db::Ch>) -> impl Responder {
     };
 
     let markup = html! {
-        div id="db-status" 
+        div id="db-status"
             class=(format!("flex items-center pa2 br2 dib {}", status_class))
             hx-get="/health/db/status"
             hx-trigger="every 10s"
@@ -69,7 +69,10 @@ async fn main() -> std::io::Result<()> {
             .service(health_db)
             .service(health_db_status)
             .service(assets::assets)
-            .route("/", web::get().to(index::index))
+            .service(view::index)
+            .service(view::home::home_page)
+            .service(view::about::about_page)
+            .service(view::how_it_works::how_it_works_page)
     })
     .bind(bind_address)?
     .run()
