@@ -2,7 +2,7 @@ use actix_web::Result as AwResult;
 use actix_web::{HttpRequest, get};
 use maud::html;
 
-#[get("/ui/home")]
+#[get("/home")]
 pub async fn home_page(req: HttpRequest) -> AwResult<maud::Markup> {
     let content = html! {
         div {

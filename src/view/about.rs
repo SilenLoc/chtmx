@@ -2,10 +2,10 @@ use actix_web::Result as AwResult;
 use actix_web::{HttpRequest, get};
 use maud::html;
 
-#[get("/ui/about")]
+#[get("/about")]
 pub async fn about_page(req: HttpRequest) -> AwResult<maud::Markup> {
     let content = html! {
-        div class="mw7" {
+        div class="mw7 center" {
             h1 class="f2 f1-l fw2 white-90 mb3 lh-title" { "About" }
 
             div class="tl white-80 lh-copy" {

@@ -2,10 +2,10 @@ use actix_web::Result as AwResult;
 use actix_web::{HttpRequest, get};
 use maud::html;
 
-#[get("/ui/how-it-works")]
+#[get("/how-it-works")]
 pub async fn how_it_works_page(req: HttpRequest) -> AwResult<maud::Markup> {
     let content = html! {
-        div class="mw7" {
+        div class="mw7 center" {
             h1 class="f2 f1-l fw2 white-90 mb3 lh-title" { "How It Works" }
 
             div class="tl white-80 lh-copy" {
@@ -42,7 +42,7 @@ pub async fn how_it_works_page(req: HttpRequest) -> AwResult<maud::Markup> {
                 div class="bg-black-40 br3 pa3 mb4" {
                     p class="f6 white-70 ma0 mb2" { "Example: This navigation uses HTMX!" }
                     pre class="f7 white-90 ma0 overflow-x-auto" {
-                        code { "<a href=\"/ui/about\" hx-get=\"/ui/about\" hx-target=\"#feature\" hx-swap=\"innerHTML\">About</a>" }
+                        code { "<a href=\"/about\" hx-get=\"/about\" hx-target=\"#feature\" hx-swap=\"innerHTML\">About</a>" }
                     }
                 }
 
