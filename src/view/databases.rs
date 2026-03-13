@@ -2,7 +2,7 @@ use actix_web::Result as AwResult;
 use actix_web::{HttpRequest, get, web};
 use maud::html;
 
-use crate::db;
+use crate::{config, db, markdown_parser};
 
 #[get("/databases")]
 pub async fn databases_page(req: HttpRequest, ch: web::Data<db::Ch>) -> AwResult<maud::Markup> {
@@ -45,11 +45,11 @@ pub async fn databases_page(req: HttpRequest, ch: web::Data<db::Ch>) -> AwResult
             }
 
             // Main content area
-            div class="mw8 center ph3 mt4" {
+            div class="w-100 ph3 mt4" {
                 h1 class="f2 fw2 white-90 mb3 lh-title" { "Database Details" }
 
                 // Placeholder for future functionality
-                div class="bg-white-10 pa4 br3 mt4" {
+                div id="db-content" class="db-content bg-white-10 pa4 br3 mt4" {
                     p class="white-70 f6 i tc" {
                         "Select a database and table to view details"
                     }
@@ -89,12 +89,162 @@ pub async fn get_tables(
             id="table-select"
             name="table"
             class="input-reset ba b--white-30 pa2 w-100 br2 f6 bg-white-10 white"
-            style="color: white;" {
-            option value="" selected disabled style="background-color: #1a1a1a; color: #ccc;" { "Choose a table..." }
+            style="color: white;"
+            hx-get="/database/tables/table"
+            hx-include="[name='database']"
+            hx-target="#db-content"
+            hx-swap="innerHTML"
+            hx-trigger="change"
+            {
+            option
+            value=""
+            selected
+            disabled
+            style="background-color: #1a1a1a; color: #ccc;"
+            { "Choose a table..." }
             @for table in &tables {
                 option value=(table.name) style="background-color: #1a1a1a; color: white;" { (table.name) }
             }
         }
         }
     })
+}
+
+#[get("database/tables/table")]
+pub async fn get_table(
+    database: web::Query<std::collections::HashMap<String, String>>,
+    config: web::Data<config::Server>,
+) -> AwResult<maud::Markup> {
+    let db_name = database.get("database").map(|s| s.as_str()).unwrap_or("");
+    let table = database.get("table").map(|s| s.as_str()).unwrap_or("");
+
+    let html = get_table_as_html(&config, db_name, table, 0).await.unwrap();
+    Ok(html)
+}
+
+#[get("database/tables/table/rows")]
+pub async fn get_table_rows(
+    params: web::Query<std::collections::HashMap<String, String>>,
+    config: web::Data<config::Server>,
+) -> AwResult<maud::Markup> {
+    let db_name = params.get("database").map(|s| s.as_str()).unwrap_or("");
+    let table = params.get("table").map(|s| s.as_str()).unwrap_or("");
+    let offset: usize = params
+        .get("offset")
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(0);
+
+    let html = get_table_rows_html(&config, db_name, table, offset)
+        .await
+        .unwrap();
+    Ok(html)
+}
+
+pub async fn get_table_as_html(
+    config: &config::Server,
+    database: &str,
+    table: &str,
+    offset: usize,
+) -> Result<maud::Markup, Box<dyn std::error::Error>> {
+    const PAGE_SIZE: usize = 40;
+
+    // Get the markdown representation with pagination
+    let markdown =
+        db::get_table_as_markdown_paginated(config, database, table, PAGE_SIZE, offset).await?;
+
+    // Parse markdown table using the parser
+    let parsed_table = markdown_parser::MarkdownTable::parse(&markdown);
+
+    let Some(table_data) = parsed_table else {
+        return Ok(html! {
+            div class="pa4" {
+                p class="white-70" { "No data available" }
+            }
+        });
+    };
+
+    let next_offset = offset + PAGE_SIZE;
+    let has_more_rows = table_data.rows.len() == PAGE_SIZE;
+
+    // Build styled HTML with Tachyons classes (dark theme with white text)
+    let markup = html! {
+        div class="overflow-auto" style="min-height: 20vh; max-height: 50vh;" {
+            table class="f6 w-100" cellspacing="0" style="min-width: 800px;" {
+                thead {
+                    tr {
+                        @for header in &table_data.headers {
+                            th class="fw6 bb b--white-20 tl pb3 pr4 pl3 white-90 bg-black-80" style="position: sticky; top: 0; z-index: 10; min-width: 120px;" { (header) }
+                        }
+                    }
+                }
+                tbody id="table-body" class="lh-copy" {
+                    @for row in &table_data.rows {
+                        tr class="hover-bg-white-10" {
+                            @for cell in row {
+                                td class="pv3 pr4 pl3 bb b--white-10 white-80 tl" { (cell) }
+                            }
+                        }
+                    }
+                    @if has_more_rows {
+                        tr
+                            hx-get={"/database/tables/table/rows?database=" (database) "&table=" (table) "&offset=" (next_offset)}
+                            hx-trigger="intersect once"
+                            hx-swap="outerHTML" {
+                            td colspan="999" class="tc pv3 white-50" {
+                                "Loading more..."
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    };
+
+    Ok(markup)
+}
+
+pub async fn get_table_rows_html(
+    config: &config::Server,
+    database: &str,
+    table: &str,
+    offset: usize,
+) -> Result<maud::Markup, Box<dyn std::error::Error>> {
+    const PAGE_SIZE: usize = 40;
+
+    // Get the markdown representation with pagination
+    let markdown =
+        db::get_table_as_markdown_paginated(config, database, table, PAGE_SIZE, offset).await?;
+
+    // Parse markdown table using the parser
+    let parsed_table = markdown_parser::MarkdownTable::parse(&markdown);
+
+    let Some(table_data) = parsed_table else {
+        return Ok(html! {});
+    };
+
+    let next_offset = offset + PAGE_SIZE;
+    let has_more_rows = table_data.rows.len() == PAGE_SIZE;
+
+    // Build just the rows (no table wrapper or header)
+    let markup = html! {
+        @for row in &table_data.rows {
+            tr class="hover-bg-white-10" {
+                @for cell in row {
+                    td class="pv3 pr4 pl3 bb b--white-10 white-80 tl" { (cell) }
+                }
+            }
+        }
+        @if has_more_rows {
+            tr
+                hx-get={"/database/tables/table/rows?database=" (database) "&table=" (table) "&offset=" (next_offset)}
+                hx-trigger="intersect once"
+                hx-swap="outerHTML" {
+                td colspan="999" class="tc pv3 white-50" {
+                    "Loading more..."
+                }
+            }
+        }
+    };
+
+    Ok(markup)
 }

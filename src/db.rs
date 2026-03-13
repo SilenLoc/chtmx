@@ -141,8 +141,83 @@ pub async fn all_tables(ch: Ch, database: &str) -> Vec<Table> {
     tables
 }
 
+pub async fn get_table_as_markdown_paginated(
+    config: &config::Server,
+    database: &str,
+    table: &str,
+    limit: usize,
+    offset: usize,
+) -> Result<String, Box<dyn std::error::Error>> {
+    let query = format!(
+        "SELECT * FROM {}.{} LIMIT {} OFFSET {} FORMAT Markdown",
+        database, table, limit, offset
+    );
+    get_as_markdown(config, &query).await
+}
 
-pub async fn get_table_as_markdown(ch: Ch, database: &str, table: &str) -> String {
-    
-    
+pub async fn get_as_markdown(
+    config: &config::Server,
+    query: &str,
+) -> Result<String, Box<dyn std::error::Error>> {
+    // Ensure the query ends with FORMAT Markdown
+    let query_with_format = if query.trim().to_uppercase().contains("FORMAT") {
+        query.to_string()
+    } else {
+        format!("{} FORMAT Markdown", query.trim())
+    };
+
+    // Build the HTTP client
+    let client = reqwest::Client::new();
+
+    // Build the request
+    let mut request = client
+        .post(config.clickhouse_url())
+        .query(&[("user", config.clickhouse_user())])
+        .body(query_with_format);
+
+    // Add password if present
+    if !config.clickhouse_password().is_empty() {
+        request = request.query(&[("password", config.clickhouse_password())]);
+    }
+
+    // Execute the request
+    let response = request.send().await?;
+
+    // Check for errors
+    if !response.status().is_success() {
+        let error_text = response.text().await?;
+        return Err(format!("ClickHouse error: {}", error_text).into());
+    }
+
+    // Get the response body as text
+    let markdown = response.text().await?;
+    Ok(markdown)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    #[ignore] // Run with: cargo test -- --ignored
+    async fn test_get_as_markdown() {
+        let config = config::Server::new(
+            ("0.0.0.0".to_string(), 8080),
+            "info".to_string(),
+            "http://localhost:8123".to_string(),
+            "default".to_string(),
+            String::new(),
+        );
+
+        // Test with a simple query
+        let result = get_as_markdown(&config, "SELECT number, number * 2 FROM numbers(5)")
+            .await
+            .expect("Failed to get markdown");
+
+        println!("Markdown result:\n{}", result);
+
+        // Verify it contains markdown table characters
+        assert!(result.contains("|"));
+        assert!(result.contains("number"));
+    }
 }

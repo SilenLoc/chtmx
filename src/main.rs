@@ -5,6 +5,7 @@ use log::info;
 mod assets;
 mod config;
 mod db;
+mod markdown_parser;
 mod upload;
 mod view;
 
@@ -60,12 +61,14 @@ async fn main() -> std::io::Result<()> {
 
     let clickhouse = db::connect(&config);
     let clickhouse_data = web::Data::new(clickhouse);
+    let config = web::Data::new(config);
 
     let bind_address = config.address();
 
     HttpServer::new(move || {
         App::new()
             .app_data(clickhouse_data.clone())
+            .app_data(config.clone())
             .service(health)
             .service(health_db)
             .service(health_db_status)
@@ -77,6 +80,8 @@ async fn main() -> std::io::Result<()> {
             .service(view::upload::upload_page)
             .service(view::databases::databases_page)
             .service(view::databases::get_tables)
+            .service(view::databases::get_table)
+            .service(view::databases::get_table_rows)
             .service(upload::upload_csv)
     })
     .bind(bind_address)?
