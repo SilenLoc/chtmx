@@ -1,3 +1,6 @@
+use clickhouse::Row;
+use serde::{Deserialize, Serialize};
+
 use crate::config;
 
 pub type Ch = clickhouse::Client;
@@ -101,4 +104,45 @@ impl DynTable {
     pub fn new(name: String, fields: Vec<String>, rows: Vec<Vec<String>>) -> Self {
         Self { name, fields, rows }
     }
+}
+
+#[derive(Serialize, Deserialize, Row)]
+pub struct Database {
+    pub name: String,
+}
+
+pub async fn all_databases(ch: Ch) -> Vec<Database> {
+    let mut cursor = ch
+        .query("SELECT name FROM system.databases")
+        .fetch::<Database>()
+        .unwrap();
+    let mut databases = Vec::new();
+    while let Some(row) = cursor.next().await.unwrap() {
+        databases.push(row);
+    }
+    databases
+}
+
+#[derive(Serialize, Deserialize, Row)]
+pub struct Table {
+    pub name: String,
+}
+
+pub async fn all_tables(ch: Ch, database: &str) -> Vec<Table> {
+    let mut cursor = ch
+        .query("SELECT name FROM system.tables WHERE database = ?")
+        .bind(database)
+        .fetch::<Table>()
+        .unwrap();
+    let mut tables = Vec::new();
+    while let Some(row) = cursor.next().await.unwrap() {
+        tables.push(row);
+    }
+    tables
+}
+
+
+pub async fn get_table_as_markdown(ch: Ch, database: &str, table: &str) -> String {
+    
+    
 }

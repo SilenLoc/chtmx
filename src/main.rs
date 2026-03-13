@@ -75,6 +75,8 @@ async fn main() -> std::io::Result<()> {
             .service(view::about::about_page)
             .service(view::how_it_works::how_it_works_page)
             .service(view::upload::upload_page)
+            .service(view::databases::databases_page)
+            .service(view::databases::get_tables)
             .service(upload::upload_csv)
     })
     .bind(bind_address)?

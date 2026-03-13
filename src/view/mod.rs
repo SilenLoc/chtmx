@@ -3,6 +3,7 @@ use actix_web::{HttpRequest, get};
 use maud::{DOCTYPE, html};
 
 pub mod about;
+pub mod databases;
 pub mod home;
 pub mod how_it_works;
 pub mod upload;
@@ -46,6 +47,12 @@ pub fn render_layout(main_content: &maud::Markup) -> maud::Markup {
                         }
                     }
                     div class="dtc v-mid tr pa3" {
+                        a class="f6 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3"
+                          href="/databases"
+                          hx-get="/databases"
+                          hx-target="#feature"
+                          hx-swap="innerHTML"
+                          hx-push-url="true" { "Databases" }
                         a class="f6 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3"
                           href="/upload"
                           hx-get="/upload"
