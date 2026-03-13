@@ -1,8 +1,6 @@
 services:
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: silenloc/chtmx
     container_name: chtmx
     ports:
       - "8080:8080"

@@ -5,6 +5,7 @@ use log::info;
 mod assets;
 mod config;
 mod db;
+mod upload;
 mod view;
 
 #[get("/health")]
@@ -73,6 +74,8 @@ async fn main() -> std::io::Result<()> {
             .service(view::home::home_page)
             .service(view::about::about_page)
             .service(view::how_it_works::how_it_works_page)
+            .service(view::upload::upload_page)
+            .service(upload::upload_csv)
     })
     .bind(bind_address)?
     .run()

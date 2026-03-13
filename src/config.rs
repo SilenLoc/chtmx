@@ -76,6 +76,7 @@ fn ascii(server: &Server) -> String {
     let (_, port) = server.address();
 
     let url = format!("http://localhost:{port}");
+    let version = env!("CARGO_PKG_VERSION");
     format!(
         "
         ┌─────────────────────────────────┐
@@ -87,6 +88,7 @@ fn ascii(server: &Server) -> String {
         └─────────────────────────────────┘
         
         Server running at: {url}
+        Version: {version}
         "
     )
 }

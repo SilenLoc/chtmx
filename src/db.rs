@@ -14,23 +14,68 @@ pub fn connect(config: &config::Server) -> Ch {
     client
 }
 
+pub async fn create_table_from_csv(
+    ch: Ch,
+    csv_file_name: &str,
+    csv: &[u8],
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mut rdr = csv::Reader::from_reader(csv);
+
+    let headers = rdr
+        .headers()?
+        .iter()
+        .map(|s| {
+            // Sanitize column names: replace spaces and special chars with underscores
+            s.replace(
+                [' ', '-', '.', '(', ')', '[', ']', '{', '}', '/', '\\'],
+                "_",
+            )
+        })
+        .collect::<Vec<_>>();
+
+    let rows = rdr
+        .records()
+        .map(|r| r.map(|record| record.iter().map(|s| s.to_string()).collect::<Vec<_>>()))
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let table = DynTable::new(csv_file_name.to_string(), headers, rows);
+    create_dyn_table(table, ch).await?;
+    Ok(())
+}
+
 #[allow(unused)]
-pub async fn create_dyn_table(table: DynTable, ch: Ch) -> DynTable {
+pub async fn create_dyn_table(table: DynTable, ch: Ch) -> Result<(), Box<dyn std::error::Error>> {
+    // Build column definitions with types (all as String)
+    let columns_with_types = table
+        .fields
+        .iter()
+        .map(|field| format!("`{}` String", field))
+        .collect::<Vec<_>>()
+        .join(", ");
+
     ch.query(&format!(
         "CREATE TABLE IF NOT EXISTS {} ({}) ENGINE = MergeTree() ORDER BY tuple()",
-        table.name,
-        table.fields.join(", ")
+        table.name, columns_with_types
     ))
     .execute()
-    .await
-    .unwrap();
+    .await?;
 
     // insert rows
     if !table.rows.is_empty() {
         let values_list: Vec<String> = table
             .rows
             .iter()
-            .map(|row| format!("({})", row.join(", ")))
+            .map(|row| {
+                let quoted_values = row
+                    .iter()
+                    .map(|val| {
+                        // Escape single quotes in the value and wrap in quotes
+                        format!("'{}'", val.replace('\'', "\\'"))
+                    })
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                format!("({})", quoted_values)
+            })
             .collect();
 
         ch.query(&format!(
@@ -39,11 +84,9 @@ pub async fn create_dyn_table(table: DynTable, ch: Ch) -> DynTable {
             values_list.join(", ")
         ))
         .execute()
-        .await
-        .unwrap();
+        .await?;
     }
-
-    table
+    Ok(())
 }
 
 #[allow(unused)]

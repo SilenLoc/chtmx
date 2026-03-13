@@ -5,6 +5,7 @@ use maud::{DOCTYPE, html};
 pub mod about;
 pub mod home;
 pub mod how_it_works;
+pub mod upload;
 
 #[get("/")]
 pub async fn index(req: HttpRequest) -> AwResult<maud::Markup> {
@@ -45,6 +46,12 @@ pub fn render_layout(main_content: &maud::Markup) -> maud::Markup {
                         }
                     }
                     div class="dtc v-mid tr pa3" {
+                        a class="f6 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3"
+                          href="/upload"
+                          hx-get="/upload"
+                          hx-target="#feature"
+                          hx-swap="innerHTML"
+                          hx-push-url="true" { "Upload CSV" }
                         a class="f6 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3"
                           href="/how-it-works"
                           hx-get="/how-it-works"

@@ -4,9 +4,11 @@ use maud::html;
 
 #[get("/about")]
 pub async fn about_page(req: HttpRequest) -> AwResult<maud::Markup> {
+    let version = env!("CARGO_PKG_VERSION");
     let content = html! {
         div class="mw7 center" {
             h1 class="f2 f1-l fw2 white-90 mb3 lh-title" { "About" }
+            p class="f6 white-60 mb3" { "Version " (version) }
 
             div class="tl white-80 lh-copy" {
                 p class="f4 mb3" {
