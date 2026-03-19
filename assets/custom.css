@@ -41,7 +41,7 @@
 
 /* Custom Dark Orange & Pink Theme Colors */
 .bg-dark-orange {
-    background-color: #ff8c1a;
+    background-color: #b45309;
 }
 
 .bg-deep-orange {
@@ -50,7 +50,7 @@
 
 .hover-bg-dark-orange:focus,
 .hover-bg-dark-orange:hover {
-    background-color: #ff8c1a;
+    background-color: #b45309;
 }
 
 .hover-bg-deep-orange:focus,
@@ -59,7 +59,7 @@
 }
 
 .dark-orange {
-    color: #ff8c1a;
+    color: #b45309;
 }
 
 .deep-orange {
@@ -68,11 +68,11 @@
 
 .hover-dark-orange:focus,
 .hover-dark-orange:hover {
-    color: #ff8c1a;
+    color: #b45309;
 }
 
 .b--dark-orange {
-    border-color: #ff8c1a;
+    border-color: #b45309;
 }
 
 .b--deep-orange {
@@ -121,19 +121,19 @@
 
 /* Orange-tinted backgrounds for panels */
 .bg-orange-10 {
-    background-color: rgba(255, 140, 26, 0.1);
+    background-color: rgba(180, 83, 9, 0.1);
 }
 
 .bg-orange-20 {
-    background-color: rgba(255, 140, 26, 0.2);
+    background-color: rgba(180, 83, 9, 0.2);
 }
 
 .hover-bg-orange-10:focus,
 .hover-bg-orange-10:hover {
-    background-color: rgba(255, 140, 26, 0.1);
+    background-color: rgba(180, 83, 9, 0.1);
 }
 
 .hover-bg-orange-20:focus,
 .hover-bg-orange-20:hover {
-    background-color: rgba(255, 140, 26, 0.2);
+    background-color: rgba(180, 83, 9, 0.2);
 }
