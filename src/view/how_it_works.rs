@@ -10,74 +10,87 @@ pub async fn how_it_works_page(req: HttpRequest) -> AwResult<maud::Markup> {
 
             div class="tl white-80 lh-copy" {
                 p class="f4 mb4" {
-                    "CHTMX is a modern web application built with Rust, HTMX, and Tachyons CSS. "
-                    "It demonstrates how to build fast, interactive web applications without heavy JavaScript frameworks."
+                    "CHTMX demonstrates building fast, interactive web applications using a modern stack: "
+                    "Rust for the backend, HTMX for dynamic frontend interactions, and ClickHouse for data storage. "
+                    "The entire application runs without heavy JavaScript frameworks or client-side rendering."
                 }
 
-                h2 class="f3 fw6 white-90 mb3 mt4" { "🦀 Rust Backend" }
+                h2 class="f3 fw6 white-90 mb3 mt4" { "Architecture Overview" }
                 p class="f5 mb3" {
-                    "The backend is powered by "
-                    span class="fw6" { "Actix-web" }
-                    ", a blazingly fast web framework for Rust. It provides:"
-                }
-                ul class="f5 list pl3 mb4" {
-                    li class="mb2" { "⚡ Lightning-fast response times" }
-                    li class="mb2" { "🔒 Memory safety without garbage collection" }
-                    li class="mb2" { "🚀 Async/await support for concurrent operations" }
-                    li class="mb2" { "📊 ClickHouse database integration for analytics" }
+                    "The application follows a server-side rendering approach where the backend generates HTML fragments "
+                    "that are swapped into the page by HTMX. This results in a responsive user experience with minimal "
+                    "client-side complexity."
                 }
 
-                h2 class="f3 fw6 white-90 mb3 mt4" { "✨ HTMX Frontend" }
+                h2 class="f3 fw6 white-90 mb3 mt4" { "Backend - Rust & Actix-web" }
                 p class="f5 mb3" {
-                    span class="fw6" { "HTMX" }
-                    " allows you to access modern browser features directly from HTML, making it simple to:"
+                    "The server is built with Actix-web, a high-performance web framework. Each HTTP endpoint returns "
+                    "HTML rendered using the Maud template engine. The compile-time template checking ensures type safety "
+                    "and prevents XSS vulnerabilities through automatic escaping."
                 }
-                ul class="f5 list pl3 mb4" {
-                    li class="mb2" { "🔄 Update page content without full page reloads" }
-                    li class="mb2" { "📡 Make AJAX requests with simple HTML attributes" }
-                    li class="mb2" { "🎯 Swap content dynamically using CSS selectors" }
-                    li class="mb2" { "📱 Create SPA-like experiences with minimal JavaScript" }
+                p class="f5 mb3" {
+                    "ClickHouse integration provides fast analytical queries on large datasets. The application uses "
+                    "the ClickHouse HTTP interface to execute queries and transform results into HTML tables."
                 }
 
+                h2 class="f3 fw6 white-90 mb3 mt4" { "Frontend - HTMX" }
+                p class="f5 mb3" {
+                    "HTMX enables dynamic content updates through HTML attributes. When a user clicks a navigation link "
+                    "or submits a form, HTMX makes an AJAX request and swaps the returned HTML into the specified target element."
+                }
                 div class="bg-black-40 br3 pa3 mb4" {
-                    p class="f6 white-70 ma0 mb2" { "Example: This navigation uses HTMX!" }
+                    p class="f6 white-70 ma0 mb2" { "Example: Navigation link with HTMX attributes" }
                     pre class="f7 white-90 ma0 overflow-x-auto" {
-                        code { "<a href=\"/about\" hx-get=\"/about\" hx-target=\"#feature\" hx-swap=\"innerHTML\">About</a>" }
+                        code { "<a href=\"/databases\" hx-get=\"/databases\" hx-target=\"#feature\">Databases</a>" }
                     }
                 }
-
-                h2 class="f3 fw6 white-90 mb3 mt4" { "🎨 Tachyons CSS" }
                 p class="f5 mb3" {
-                    span class="fw6" { "Tachyons" }
-                    " is a functional CSS framework that provides:"
-                }
-                ul class="f5 list pl3 mb4" {
-                    li class="mb2" { "📦 Small file size (only ~14kb)" }
-                    li class="mb2" { "🎯 Composable design system" }
-                    li class="mb2" { "📱 Mobile-first responsive design" }
-                    li class="mb2" { "⚡ No build step required" }
+                    "This approach eliminates the need for a JavaScript build step while still providing a modern, "
+                    "single-page-application feel. Browser history is preserved using hx-push-url."
                 }
 
-                h2 class="f3 fw6 white-90 mb3 mt4" { "🔧 Template Rendering" }
+                h2 class="f3 fw6 white-90 mb3 mt4" { "Styling - Tachyons CSS" }
                 p class="f5 mb3" {
-                    "HTML is rendered using "
-                    span class="fw6" { "Maud" }
-                    ", a compile-time HTML template engine for Rust that ensures:"
-                }
-                ul class="f5 list pl3 mb4" {
-                    li class="mb2" { "✅ Type-safe templates checked at compile time" }
-                    li class="mb2" { "🛡️ Automatic escaping to prevent XSS attacks" }
-                    li class="mb2" { "⚡ Zero-cost abstraction for HTML generation" }
-                    li class="mb2" { "🎯 Rust's powerful type system for your views" }
+                    "Tachyons provides utility-first CSS classes that are composed directly in the HTML. "
+                    "The framework is small (14kb), requires no build step, and makes it easy to create consistent, "
+                    "responsive designs. Custom color classes extend the base Tachyons palette for project-specific theming."
                 }
 
-                h2 class="f3 fw6 white-90 mb3 mt4" { "🚀 Why This Stack?" }
+                h2 class="f3 fw6 white-90 mb3 mt4" { "Data Flow Example" }
+                p class="f5 mb3" {
+                    "When viewing a database table:"
+                }
+                ol class="f5 pl3 mb4" {
+                    li class="mb2" { "User selects a database from the dropdown (triggers hx-get request)" }
+                    li class="mb2" { "Server queries ClickHouse for table list in that database" }
+                    li class="mb2" { "Rust renders HTML select element with table options" }
+                    li class="mb2" { "HTMX swaps the HTML into the page" }
+                    li class="mb2" { "User selects a table (triggers another hx-get request)" }
+                    li class="mb2" { "Server queries ClickHouse for table data with pagination" }
+                    li class="mb2" { "Rust renders HTML table with the data" }
+                    li class="mb2" { "HTMX swaps the table into the content area" }
+                    li class="mb2" { "Infinite scroll loads more rows as user scrolls (hx-trigger=\"intersect\")" }
+                }
+
+                h2 class="f3 fw6 white-90 mb3 mt4" { "Key Benefits" }
                 div class="bg-black-40 br3 pa3" {
-                    ul class="f5 list pl3 ma0" {
-                        li class="mb2" { "⚡ " span class="fw6" { "Performance" } " - Rust's speed + minimal JavaScript" }
-                        li class="mb2" { "🔒 " span class="fw6" { "Safety" } " - Compile-time guarantees prevent bugs" }
-                        li class="mb2" { "🎯 " span class="fw6" { "Simplicity" } " - Less code to maintain and debug" }
-                        li class="mb2" { "📦 " span class="fw6" { "Small bundle" } " - Faster load times for users" }
+                    dl class="f5 ma0" {
+                        dt class="fw6 mb1" { "Performance" }
+                        dd class="ml0 mb3 white-70" {
+                            "Rust provides native-code performance. Minimal JavaScript means faster page loads and lower memory usage."
+                        }
+                        dt class="fw6 mb1" { "Type Safety" }
+                        dd class="ml0 mb3 white-70" {
+                            "The Rust compiler catches errors at build time. Maud templates are checked for validity during compilation."
+                        }
+                        dt class="fw6 mb1" { "Simplicity" }
+                        dd class="ml0 mb3 white-70" {
+                            "No JavaScript framework complexity. No build toolchain. Server-rendered HTML is easier to reason about and debug."
+                        }
+                        dt class="fw6 mb1" { "Scalability" }
+                        dd class="ml0 mb3 white-70" {
+                            "ClickHouse handles analytical workloads efficiently. Actix-web provides async request handling."
+                        }
                     }
                 }
             }

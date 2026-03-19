@@ -11,7 +11,7 @@ pub async fn upload_page(req: HttpRequest) -> AwResult<maud::Markup> {
                 "Upload a CSV file to create a new table in ClickHouse"
             }
 
-            div class="bg-white-10 pa4 br3 mt4" {
+            div class="bg-orange-10 pa4 br3 mt4" {
                 form
                     id="upload-form"
                     hx-post="/upload/csv"
@@ -41,7 +41,7 @@ pub async fn upload_page(req: HttpRequest) -> AwResult<maud::Markup> {
                     }
 
                     button
-                        class="button-reset bn bg-blue white br2 pa3 w-100 f5 pointer grow"
+                        class="button-reset bn bg-action-pink white br2 pa3 w-100 f5 pointer grow hover-bg-deep-pink"
                         type="submit" {
                         "Upload and Create Table"
                     }

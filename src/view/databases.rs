@@ -49,7 +49,7 @@ pub async fn databases_page(req: HttpRequest, ch: web::Data<db::Ch>) -> AwResult
                 h1 id="db-heading" class="f4 fw6 white-90 mb3 lh-title" { "Select a database" }
 
                 // Placeholder for future functionality - flex-auto to fill remaining space
-                div id="db-content" class="db-content bg-white-10 br3 flex-auto flex flex-column" style="overflow: hidden;" {
+                div id="db-content" class="db-content bg-orange-10 br3 flex-auto flex flex-column" style="overflow: hidden;" {
                     p class="white-70 f6 i tc pa4" {
                         "Select a database and table to view details"
                     }
@@ -125,7 +125,7 @@ pub async fn get_table(
     let table = database.get("table").map(|s| s.as_str()).unwrap_or("");
 
     let table_html = get_table_as_html(&config, db_name, table, 0).await.unwrap();
-    
+
     // Return both the heading update and the table content
     Ok(html! {
         // Update the heading with database and table name
@@ -134,7 +134,7 @@ pub async fn get_table(
            hx-swap-oob="true" {
             (db_name) span class="white-50" { " / " } (table)
         }
-        
+
         // The actual table content
         (table_html)
     })
@@ -185,7 +185,7 @@ pub async fn get_table_as_html(
                 }
                 tbody id="table-body" class="lh-copy" {
                     @for row in &dyn_table.rows {
-                        tr class="hover-bg-white-10" {
+                        tr class="hover-bg-orange-10" {
                             @for cell in row {
                                 td class="pv3 pr4 pl3 bb b--white-10 white-80 tl" { (cell) }
                             }
@@ -226,7 +226,7 @@ pub async fn get_table_rows_html(
     // Build just the rows (no table wrapper or header)
     let markup = html! {
         @for row in &dyn_table.rows {
-            tr class="hover-bg-white-10" {
+            tr class="hover-bg-orange-10" {
                 @for cell in row {
                     td class="pv3 pr4 pl3 bb b--white-10 white-80 tl" { (cell) }
                 }

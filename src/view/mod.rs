@@ -13,12 +13,12 @@ pub async fn index(req: HttpRequest) -> AwResult<maud::Markup> {
     let content = html! {
         div class="tl" {
             h1 class="f2 fw6 white mb2 lh-title" { "CHTMX" }
-            p class="f5 white-70 mt2 mb4 lh-copy" { 
+            p class="f5 white-70 mt2 mb4 lh-copy" {
                 "Testing the capabilities of ClickHouse, HTMX, and Rust"
             }
-            
+
             h2 class="f4 fw6 white-90 mt4 mb3 bb b--white-20 pb2" { "Features" }
-            
+
             div class="flex flex-wrap nl2 nr2" {
                 // Databases Panel
                 a href="/databases"
@@ -27,13 +27,12 @@ pub async fn index(req: HttpRequest) -> AwResult<maud::Markup> {
                   hx-swap="innerHTML"
                   hx-push-url="true"
                   class="no-underline w-50-ns w-100 pa2" {
-                    div class="bg-white-10 white hover-bg-white-20 br2 pa3 h-100" {
-                        div class="f3 mb2" { "🗄️" }
+                    div class="bg-orange-10 white hover-bg-orange-20 br2 pa3 h-100" {
                         h3 class="f5 fw6 mb2 white" { "Databases" }
                         p class="f6 white-60 lh-copy ma0" { "Browse ClickHouse databases and tables" }
                     }
                 }
-                
+
                 // Upload CSV Panel
                 a href="/upload"
                   hx-get="/upload"
@@ -41,13 +40,12 @@ pub async fn index(req: HttpRequest) -> AwResult<maud::Markup> {
                   hx-swap="innerHTML"
                   hx-push-url="true"
                   class="no-underline w-50-ns w-100 pa2" {
-                    div class="bg-white-10 white hover-bg-white-20 br2 pa3 h-100" {
-                        div class="f3 mb2" { "📤" }
+                    div class="bg-orange-10 white hover-bg-orange-20 br2 pa3 h-100" {
                         h3 class="f5 fw6 mb2 white" { "Upload CSV" }
                         p class="f6 white-60 lh-copy ma0" { "Import CSV files into ClickHouse" }
                     }
                 }
-                
+
                 // How it Works Panel
                 a href="/how-it-works"
                   hx-get="/how-it-works"
@@ -55,13 +53,12 @@ pub async fn index(req: HttpRequest) -> AwResult<maud::Markup> {
                   hx-swap="innerHTML"
                   hx-push-url="true"
                   class="no-underline w-50-ns w-100 pa2" {
-                    div class="bg-white-10 white hover-bg-white-20 br2 pa3 h-100" {
-                        div class="f3 mb2" { "⚙️" }
+                    div class="bg-orange-10 white hover-bg-orange-20 br2 pa3 h-100" {
                         h3 class="f5 fw6 mb2 white" { "How it Works" }
                         p class="f6 white-60 lh-copy ma0" { "Learn about the tech stack" }
                     }
                 }
-                
+
                 // About Panel
                 a href="/about"
                   hx-get="/about"
@@ -69,8 +66,7 @@ pub async fn index(req: HttpRequest) -> AwResult<maud::Markup> {
                   hx-swap="innerHTML"
                   hx-push-url="true"
                   class="no-underline w-50-ns w-100 pa2" {
-                    div class="bg-white-10 white hover-bg-white-20 br2 pa3 h-100" {
-                        div class="f3 mb2" { "ℹ️" }
+                    div class="bg-orange-10 white hover-bg-orange-20 br2 pa3 h-100" {
                         h3 class="f5 fw6 mb2 white" { "About" }
                         p class="f6 white-60 lh-copy ma0" { "More information about this project" }
                     }
