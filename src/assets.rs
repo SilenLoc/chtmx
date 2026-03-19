@@ -1,6 +1,7 @@
 use actix_web::{HttpRequest, HttpResponse, Responder, get};
 
 const TCSS: &str = include_str!("../assets/t.css");
+const CUSTOM_CSS: &str = include_str!("../assets/custom.css");
 const HTMX: &str = include_str!("../assets/h.js");
 const BACKGROUND: &[u8] = include_bytes!("../assets/background.jpg");
 
@@ -9,6 +10,9 @@ pub async fn assets(req: HttpRequest) -> impl Responder {
     let path = req.match_info().query("filename");
 
     match path {
+        "custom.css" => HttpResponse::Ok()
+            .content_type("text/css; charset=utf-8")
+            .body(CUSTOM_CSS),
         "t.css" => HttpResponse::Ok()
             .content_type("text/css; charset=utf-8")
             .body(TCSS),
