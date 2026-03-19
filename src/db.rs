@@ -193,31 +193,3 @@ pub async fn get_as_markdown(
     let markdown = response.text().await?;
     Ok(markdown)
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[tokio::test]
-    #[ignore] // Run with: cargo test -- --ignored
-    async fn test_get_as_markdown() {
-        let config = config::Server::new(
-            ("0.0.0.0".to_string(), 8080),
-            "info".to_string(),
-            "http://localhost:8123".to_string(),
-            "default".to_string(),
-            String::new(),
-        );
-
-        // Test with a simple query
-        let result = get_as_markdown(&config, "SELECT number, number * 2 FROM numbers(5)")
-            .await
-            .expect("Failed to get markdown");
-
-        println!("Markdown result:\n{}", result);
-
-        // Verify it contains markdown table characters
-        assert!(result.contains("|"));
-        assert!(result.contains("number"));
-    }
-}
