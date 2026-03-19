@@ -225,6 +225,27 @@ pub async fn get_table_as_html(
     // Build styled HTML with Tachyons classes (dark theme with white text)
     let markup = html! {
         div id="table-container" class="overflow-auto flex-auto relative" style="min-height: 400px;" {
+            // Show "Clear all filters" button if there are any active filters
+            @if !filters.is_empty() {
+                div class="pa2 bb b--white-20 flex items-center justify-between bg-near-black" {
+                    div class="f6 white-70" {
+                        "Active filters: "
+                        @for (idx, (col, vals)) in filters.iter().enumerate() {
+                            @if idx > 0 { ", " }
+                            span class="white-90 fw6" { (col) }
+                            " (" (vals.len()) ")"
+                        }
+                    }
+                    button
+                        class="bn bg-orange white br2 ph3 pv2 pointer hover-bg-dark-orange f6 fw6"
+                        hx-get={"/database/tables/table?database=" (database) "&table=" (table)}
+                        hx-trigger="click"
+                        hx-target="#table-container"
+                        hx-swap="outerHTML"
+                        hx-push-url="true"
+                        { "Clear All Filters" }
+                }
+            }
             table class="f6 w-100" cellspacing="0" style="min-width: 800px;" {
                 thead {
                     tr {
@@ -233,13 +254,17 @@ pub async fn get_table_as_html(
                                 div class="flex items-center justify-between" {
                                     span { (column.name) }
                                     // Filter icon for each column
+                                    @let has_filter = filters.contains_key(&column.name);
                                     button
                                         class="bn bg-transparent pointer pa1 ml2 filter-trigger"
                                         onclick={"toggleFilter('" (column.name) "', '" (database) "', '" (table) "')"}
                                         title="Filter column"
                                         {
-                                        svg class="w1 h1 white-70 hover-white" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" {
+                                        svg class={"w1 h1 hover-white " @if has_filter { "white" } @else { "white-70" }} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" {
                                             path d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z" {}
+                                        }
+                                        @if has_filter {
+                                            span class="absolute top-0 right-0 white bg-orange br-100" style="width: 6px; height: 6px;" {}
                                         }
                                     }
                                 }
@@ -272,6 +297,22 @@ pub async fn get_table_as_html(
                                             hx-target={"#filter-values-" (column.name)}
                                             hx-include="this"
                                             hx-swap="innerHTML";
+                                    }
+                                    // Select All / Deselect All buttons
+                                    div class="pa2 bb b--white-20 flex gap2" {
+                                        button
+                                            type="button"
+                                            class="bn bg-transparent white-70 hover-white pointer f7 pa0 underline"
+                                            onclick={"selectAllFilters('" (column.name) "')"} {
+                                            "Select All"
+                                        }
+                                        span class="white-30" { " / " }
+                                        button
+                                            type="button"
+                                            class="bn bg-transparent white-70 hover-white pointer f7 pa0 underline"
+                                            onclick={"deselectAllFilters('" (column.name) "')"} {
+                                            "Deselect All"
+                                        }
                                     }
                                     // Checkbox list container (scrollable)
                                     div id={"filter-values-" (column.name)} class="overflow-y-auto pa2" style="max-height: 250px;"
@@ -340,6 +381,22 @@ pub async fn get_table_as_html(
                 const flyout = document.getElementById('filter-flyout-' + columnName);
                 if (flyout) {
                     flyout.classList.toggle('dn');
+                }
+            }
+            
+            function selectAllFilters(columnName) {
+                const container = document.getElementById('filter-values-' + columnName);
+                if (container) {
+                    const checkboxes = container.querySelectorAll('input[type="checkbox"]');
+                    checkboxes.forEach(cb => cb.checked = true);
+                }
+            }
+            
+            function deselectAllFilters(columnName) {
+                const container = document.getElementById('filter-values-' + columnName);
+                if (container) {
+                    const checkboxes = container.querySelectorAll('input[type="checkbox"]');
+                    checkboxes.forEach(cb => cb.checked = false);
                 }
             }
         </script>"#))
@@ -418,9 +475,11 @@ pub async fn get_column_values(
                 k if k.starts_with("selected_") => {
                     // Collect currently selected filter values
                     if let Some(col) = k.strip_prefix("selected_")
-                        && col == column && !value.is_empty() {
-                            selected_values.push(value);
-                        }
+                        && col == column
+                        && !value.is_empty()
+                    {
+                        selected_values.push(value);
+                    }
                 }
                 _ => {}
             }
