@@ -12,34 +12,32 @@ pub async fn databases_page(req: HttpRequest, ch: web::Data<db::Ch>) -> AwResult
         div class="w-100 flex flex-column" style="height: 100%;" {
             // Control area at the very top - full width with horizontal layout
             div class="bg-black-70 pa3" {
-                div class="mw8 center" {
-                    div class="flex items-end" {
-                        // Database dropdown
-                        div class="mr3 flex" style="min-width: 250px;" {
-                            label class="db fw6 lh-copy f6 mr2 white-90" for="database-select" {
-                                "Database"
-                            }
-                            select
-                                id="database-select"
-                                name="database"
-                                class="input-reset ba b--white-30 pa2 w-100 br2 f6 bg-white-10 white"
-                                style="color: white;"
-                                hx-get="/databases/tables"
-                                hx-include="[name='database']"
-                                hx-target="#table-select-container"
-                                hx-swap="innerHTML"
-                                hx-trigger="change" {
-                                option value="" selected disabled style="background-color: #1a1a1a; color: #ccc;" { "Choose a database..." }
-                                @for database in &databases {
-                                    option value=(database.name) style="background-color: #1a1a1a; color: white;" { (database.name) }
-                                }
+                div class="flex items-end" {
+                    // Database dropdown
+                    div class="mr3 flex" style="min-width: 250px;" {
+                        label class="db fw6 lh-copy f6 mr2 white-90" for="database-select" {
+                            "Database"
+                        }
+                        select
+                            id="database-select"
+                            name="database"
+                            class="input-reset ba b--white-30 pa2 w-100 br2 f6 bg-white-10 white"
+                            style="color: white;"
+                            hx-get="/databases/tables"
+                            hx-include="[name='database']"
+                            hx-target="#table-select-container"
+                            hx-swap="innerHTML"
+                            hx-trigger="change" {
+                            option value="" selected disabled style="background-color: #1a1a1a; color: #ccc;" { "Choose a database..." }
+                            @for database in &databases {
+                                option value=(database.name) style="background-color: #1a1a1a; color: white;" { (database.name) }
                             }
                         }
+                    }
 
-                        // Table dropdown container (will be populated via HTMX)
-                        div id="table-select-container" style="min-width: 250px;" {
-                            // Tables dropdown will be loaded here
-                        }
+                    // Table dropdown container (will be populated via HTMX)
+                    div id="table-select-container" style="min-width: 250px;" {
+                        // Tables dropdown will be loaded here
                     }
                 }
             }
@@ -118,26 +116,38 @@ pub async fn get_tables(
 
 #[get("database/tables/table")]
 pub async fn get_table(
-    params: web::Query<std::collections::HashMap<String, String>>,
+    req: HttpRequest,
     config: web::Data<config::Server>,
 ) -> AwResult<maud::Markup> {
-    let db_name = params.get("database").map(|s| s.as_str()).unwrap_or("");
-    let table = params.get("table").map(|s| s.as_str()).unwrap_or("");
+    // Parse query string manually to get all parameter values (including duplicates)
+    let query_str = req.query_string();
 
-    // Extract filter parameters (those starting with "filter_")
-    let filters: std::collections::HashMap<String, String> = params
-        .iter()
-        .filter(|(k, _)| k.starts_with("filter_"))
-        .map(|(k, v)| {
-            (
-                k.strip_prefix("filter_").unwrap_or(k).to_string(),
-                v.clone(),
-            )
-        })
-        .filter(|(_, v)| !v.is_empty())
-        .collect();
+    let mut db_name = String::new();
+    let mut table_name = String::new();
+    let mut filters: std::collections::HashMap<String, Vec<String>> =
+        std::collections::HashMap::new();
 
-    let table_html = get_table_as_html(&config, db_name, table, 0, &filters)
+    // Parse query string
+    for pair in query_str.split('&') {
+        if let Some((key, value)) = pair.split_once('=') {
+            // Simple URL decode (replace %20 with space, etc)
+            let value = value.replace("%20", " ").replace("+", " ");
+
+            match key {
+                "database" => db_name = value,
+                "table" => table_name = value,
+                k if k.starts_with("filter_") => {
+                    if !value.is_empty() {
+                        let col = k.strip_prefix("filter_").unwrap();
+                        filters.entry(col.to_string()).or_default().push(value);
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    let table_html = get_table_as_html(&config, &db_name, &table_name, 0, &filters)
         .await
         .unwrap();
 
@@ -147,7 +157,7 @@ pub async fn get_table(
         h1 id="db-heading"
            class="f4 fw6 white-90 mb3 lh-title"
            hx-swap-oob="true" {
-            (db_name) span class="white-50" { " / " } (table)
+            (db_name) span class="white-50" { " / " } (table_name)
         }
 
         // The actual table content
@@ -157,30 +167,40 @@ pub async fn get_table(
 
 #[get("database/tables/table/rows")]
 pub async fn get_table_rows(
-    params: web::Query<std::collections::HashMap<String, String>>,
+    req: HttpRequest,
     config: web::Data<config::Server>,
 ) -> AwResult<maud::Markup> {
-    let db_name = params.get("database").map(|s| s.as_str()).unwrap_or("");
-    let table = params.get("table").map(|s| s.as_str()).unwrap_or("");
-    let offset = params
-        .get("offset")
-        .and_then(|s| s.parse::<usize>().ok())
-        .unwrap_or(0);
+    // Parse query string manually to get all parameter values (including duplicates)
+    let query_str = req.query_string();
 
-    // Extract filter parameters
-    let filters: std::collections::HashMap<String, String> = params
-        .iter()
-        .filter(|(k, _)| k.starts_with("filter_"))
-        .map(|(k, v)| {
-            (
-                k.strip_prefix("filter_").unwrap_or(k).to_string(),
-                v.clone(),
-            )
-        })
-        .filter(|(_, v)| !v.is_empty())
-        .collect();
+    let mut db_name = String::new();
+    let mut table_name = String::new();
+    let mut offset = 0;
+    let mut filters: std::collections::HashMap<String, Vec<String>> =
+        std::collections::HashMap::new();
 
-    let table_html = get_table_rows_html(&config, db_name, table, offset, &filters)
+    // Parse query string
+    for pair in query_str.split('&') {
+        if let Some((key, value)) = pair.split_once('=') {
+            // Simple URL decode (replace %20 with space, etc)
+            let value = value.replace("%20", " ").replace("+", " ");
+
+            match key {
+                "database" => db_name = value,
+                "table" => table_name = value,
+                "offset" => offset = value.parse::<usize>().unwrap_or(0),
+                k if k.starts_with("filter_") => {
+                    if !value.is_empty() {
+                        let col = k.strip_prefix("filter_").unwrap();
+                        filters.entry(col.to_string()).or_default().push(value);
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    let table_html = get_table_rows_html(&config, &db_name, &table_name, offset, &filters)
         .await
         .unwrap();
 
@@ -192,7 +212,7 @@ pub async fn get_table_as_html(
     database: &str,
     table: &str,
     offset: usize,
-    filters: &std::collections::HashMap<String, String>,
+    filters: &std::collections::HashMap<String, Vec<String>>,
 ) -> Result<maud::Markup, Box<dyn std::error::Error>> {
     const PAGE_SIZE: usize = 40;
 
@@ -224,7 +244,7 @@ pub async fn get_table_as_html(
                                     }
                                 }
                                 // Filter flyout panel (one per column, initially hidden)
-                                div id={"filter-flyout-" (column.name)} class="absolute dn bg-near-black ba b--white-20 br2 shadow-3" style="top: 100%; left: 0; width: 280px; max-height: 400px; z-index: 200; margin-top: 0.5rem;" {
+                                div id={"filter-flyout-" (column.name)} class="absolute dn bg-near-black ba b--white-20 br2 shadow-3" style="top: 100%; right: 0; width: 280px; max-height: 400px; z-index: 200; margin-top: 0.5rem;" {
                                     // Header
                                     div class="pa3 bb b--white-20 flex items-center justify-between" {
                                         h4 class="f6 fw6 white-90 ma0" { "Filter: " (column.name) }
@@ -241,7 +261,13 @@ pub async fn get_table_as_html(
                                             name="search"
                                             placeholder="Search values..."
                                             class="input-reset pa2 w-100 f6 ba b--white-30 br2 white-80 bg-black-20"
-                                            hx-get={"/database/tables/table/column/values?database=" (database) "&table=" (table) "&column=" (column.name)}
+                                            hx-get={"/database/tables/table/column/values?database=" (database) "&table=" (table) "&column=" (column.name)
+                                                @for (col, vals) in filters {
+                                                    @for val in vals {
+                                                        "&selected_" (col) "=" (val)
+                                                    }
+                                                }
+                                            }
                                             hx-trigger="keyup changed delay:300ms"
                                             hx-target={"#filter-values-" (column.name)}
                                             hx-include="this"
@@ -249,7 +275,13 @@ pub async fn get_table_as_html(
                                     }
                                     // Checkbox list container (scrollable)
                                     div id={"filter-values-" (column.name)} class="overflow-y-auto pa2" style="max-height: 250px;"
-                                        hx-get={"/database/tables/table/column/values?database=" (database) "&table=" (table) "&column=" (column.name)}
+                                        hx-get={"/database/tables/table/column/values?database=" (database) "&table=" (table) "&column=" (column.name)
+                                            @for (col, vals) in filters {
+                                                @for val in vals {
+                                                    "&selected_" (col) "=" (val)
+                                                }
+                                            }
+                                        }
                                         hx-trigger="load"
                                         hx-swap="innerHTML" {
                                         // Values will be loaded here
@@ -263,6 +295,7 @@ pub async fn get_table_as_html(
                                             hx-target="#table-container"
                                             hx-include="[name^='filter_']:checked"
                                             hx-swap="outerHTML"
+                                            hx-push-url="true"
                                             { "Apply Filter" }
                                     }
                                 }
@@ -320,7 +353,7 @@ pub async fn get_table_rows_html(
     database: &str,
     table: &str,
     offset: usize,
-    filters: &std::collections::HashMap<String, String>,
+    filters: &std::collections::HashMap<String, Vec<String>>,
 ) -> Result<maud::Markup, Box<dyn std::error::Error>> {
     const PAGE_SIZE: usize = 40;
 
@@ -357,24 +390,56 @@ pub async fn get_table_rows_html(
 
 #[get("database/tables/table/column/values")]
 pub async fn get_column_values(
-    params: web::Query<std::collections::HashMap<String, String>>,
+    req: HttpRequest,
     config: web::Data<config::Server>,
 ) -> AwResult<maud::Markup> {
-    let db_name = params.get("database").map(|s| s.as_str()).unwrap_or("");
-    let table = params.get("table").map(|s| s.as_str()).unwrap_or("");
-    let column = params.get("column").map(|s| s.as_str()).unwrap_or("");
-    let offset = params
-        .get("offset")
-        .and_then(|s| s.parse::<usize>().ok())
-        .unwrap_or(0);
-    let search = params.get("search").map(|s| s.as_str());
+    // Parse query string manually to get all parameter values (including duplicates)
+    let query_str = req.query_string();
+
+    let mut db_name = String::new();
+    let mut table = String::new();
+    let mut column = String::new();
+    let mut offset = 0;
+    let mut search = None;
+    let mut selected_values: Vec<String> = Vec::new();
+
+    // Parse query string
+    for pair in query_str.split('&') {
+        if let Some((key, value)) = pair.split_once('=') {
+            // Simple URL decode (replace %20 with space, etc)
+            let value = value.replace("%20", " ").replace("+", " ");
+
+            match key {
+                "database" => db_name = value,
+                "table" => table = value,
+                "column" => column = value,
+                "offset" => offset = value.parse::<usize>().unwrap_or(0),
+                "search" => search = Some(value),
+                k if k.starts_with("selected_") => {
+                    // Collect currently selected filter values
+                    if let Some(col) = k.strip_prefix("selected_")
+                        && col == column && !value.is_empty() {
+                            selected_values.push(value);
+                        }
+                }
+                _ => {}
+            }
+        }
+    }
 
     const PAGE_SIZE: usize = 40;
 
-    let dyn_table =
-        db::get_distinct_column_values(&config, db_name, table, column, PAGE_SIZE, offset, search)
-            .await
-            .unwrap();
+    let dyn_table = db::get_distinct_column_values(
+        &config,
+        &db_name,
+        &table,
+        &column,
+        PAGE_SIZE,
+        offset,
+        search.as_deref(),
+    )
+    .await
+    .unwrap();
 
     let next_offset = offset + PAGE_SIZE;
     let has_more = dyn_table.row_count() == PAGE_SIZE;
@@ -383,18 +448,23 @@ pub async fn get_column_values(
     let markup = html! {
         @for row_idx in 0..dyn_table.row_count() {
             @let value = dyn_table.get_value_as_string(row_idx, 0);
-            label class="db pv2 ph2 hover-bg-white-10 pointer" {
+            @let is_checked = selected_values.contains(&value);
+            label class="db pv2 ph2 hover-bg-white-10 pointer tl" {
                 input
                     type="checkbox"
                     name={"filter_" (column)}
                     value={(value)}
-                    class="mr2";
+                    class="mr2"
+                    checked[is_checked];
                 span class="white-80" { (value) }
             }
         }
         @if has_more {
             div
-                hx-get={"/database/tables/table/column/values?database=" (db_name) "&table=" (table) "&column=" (column) "&offset=" (next_offset) @if let Some(s) = search { "&search=" (s) }}
+                hx-get={"/database/tables/table/column/values?database=" (&db_name) "&table=" (&table) "&column=" (&column) "&offset=" (next_offset)
+                    @if let Some(s) = &search { "&search=" (s) }
+                    @for val in &selected_values { "&selected_" (column) "=" (val) }
+                }
                 hx-trigger="intersect once"
                 hx-swap="outerHTML"
                 class="tc pv2 white-50 f7" {

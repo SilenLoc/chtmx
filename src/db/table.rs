@@ -361,7 +361,7 @@ pub async fn get_dyn_table(
     table: &str,
     limit: usize,
     offset: usize,
-    filters: &std::collections::HashMap<String, String>,
+    filters: &std::collections::HashMap<String, Vec<String>>,
 ) -> Result<DynTable, Box<dyn std::error::Error>> {
     // Build WHERE clause from filters
     let where_clause = if filters.is_empty() {
@@ -369,11 +369,19 @@ pub async fn get_dyn_table(
     } else {
         let conditions: Vec<String> = filters
             .iter()
-            .map(|(col, val)| {
-                // Escape single quotes in the filter value
-                let escaped_val = val.replace('\'', "\\'");
-                // Use LIKE for partial matching (case-insensitive)
-                format!("`{}` ILIKE '%{}%'", col, escaped_val)
+            .map(|(col, values)| {
+                if values.len() == 1 {
+                    // Single value: use exact match
+                    let escaped_val = values[0].replace('\'', "\'\'");
+                    format!("`{}` = '{}'", col, escaped_val)
+                } else {
+                    // Multiple values: use IN clause
+                    let escaped_values: Vec<String> = values
+                        .iter()
+                        .map(|v| format!("'{}'", v.replace('\'', "\'\'")))
+                        .collect();
+                    format!("`{}` IN ({})", col, escaped_values.join(", "))
+                }
             })
             .collect();
         format!(" WHERE {}", conditions.join(" AND "))
