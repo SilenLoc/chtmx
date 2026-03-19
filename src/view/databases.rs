@@ -124,8 +124,20 @@ pub async fn get_table(
     let db_name = database.get("database").map(|s| s.as_str()).unwrap_or("");
     let table = database.get("table").map(|s| s.as_str()).unwrap_or("");
 
-    let html = get_table_as_html(&config, db_name, table, 0).await.unwrap();
-    Ok(html)
+    let table_html = get_table_as_html(&config, db_name, table, 0).await.unwrap();
+    
+    // Return both the heading update and the table content
+    Ok(html! {
+        // Update the heading with database and table name
+        h1 id="db-heading"
+           class="f4 fw6 white-90 mb3 lh-title"
+           hx-swap-oob="true" {
+            (db_name) span class="white-50" { " / " } (table)
+        }
+        
+        // The actual table content
+        (table_html)
+    })
 }
 
 #[get("database/tables/table/rows")]
