@@ -1,6 +1,6 @@
 use actix_web::Result as AwResult;
 use actix_web::{HttpRequest, get, web};
-use maud::html;
+use maud::{PreEscaped, html};
 
 use crate::{config, db};
 
@@ -118,13 +118,28 @@ pub async fn get_tables(
 
 #[get("database/tables/table")]
 pub async fn get_table(
-    database: web::Query<std::collections::HashMap<String, String>>,
+    params: web::Query<std::collections::HashMap<String, String>>,
     config: web::Data<config::Server>,
 ) -> AwResult<maud::Markup> {
-    let db_name = database.get("database").map(|s| s.as_str()).unwrap_or("");
-    let table = database.get("table").map(|s| s.as_str()).unwrap_or("");
+    let db_name = params.get("database").map(|s| s.as_str()).unwrap_or("");
+    let table = params.get("table").map(|s| s.as_str()).unwrap_or("");
 
-    let table_html = get_table_as_html(&config, db_name, table, 0).await.unwrap();
+    // Extract filter parameters (those starting with "filter_")
+    let filters: std::collections::HashMap<String, String> = params
+        .iter()
+        .filter(|(k, _)| k.starts_with("filter_"))
+        .map(|(k, v)| {
+            (
+                k.strip_prefix("filter_").unwrap_or(k).to_string(),
+                v.clone(),
+            )
+        })
+        .filter(|(_, v)| !v.is_empty())
+        .collect();
+
+    let table_html = get_table_as_html(&config, db_name, table, 0, &filters)
+        .await
+        .unwrap();
 
     // Return both the heading update and the table content
     Ok(html! {
@@ -147,15 +162,29 @@ pub async fn get_table_rows(
 ) -> AwResult<maud::Markup> {
     let db_name = params.get("database").map(|s| s.as_str()).unwrap_or("");
     let table = params.get("table").map(|s| s.as_str()).unwrap_or("");
-    let offset: usize = params
+    let offset = params
         .get("offset")
-        .and_then(|s| s.parse().ok())
+        .and_then(|s| s.parse::<usize>().ok())
         .unwrap_or(0);
 
-    let html = get_table_rows_html(&config, db_name, table, offset)
+    // Extract filter parameters
+    let filters: std::collections::HashMap<String, String> = params
+        .iter()
+        .filter(|(k, _)| k.starts_with("filter_"))
+        .map(|(k, v)| {
+            (
+                k.strip_prefix("filter_").unwrap_or(k).to_string(),
+                v.clone(),
+            )
+        })
+        .filter(|(_, v)| !v.is_empty())
+        .collect();
+
+    let table_html = get_table_rows_html(&config, db_name, table, offset, &filters)
         .await
         .unwrap();
-    Ok(html)
+
+    Ok(table_html)
 }
 
 pub async fn get_table_as_html(
@@ -163,27 +192,85 @@ pub async fn get_table_as_html(
     database: &str,
     table: &str,
     offset: usize,
+    filters: &std::collections::HashMap<String, String>,
 ) -> Result<maud::Markup, Box<dyn std::error::Error>> {
     const PAGE_SIZE: usize = 40;
 
     // Get the table data as DynTable
-    let dyn_table = db::get_dyn_table(config, database, table, PAGE_SIZE, offset).await?;
+    let dyn_table = db::get_dyn_table(config, database, table, PAGE_SIZE, offset, filters).await?;
 
     let next_offset = offset + PAGE_SIZE;
     let has_more_rows = dyn_table.row_count() == PAGE_SIZE;
 
     // Build styled HTML with Tachyons classes (dark theme with white text)
     let markup = html! {
-        div class="overflow-auto flex-auto" style="min-height: 400px;" {
+        div id="table-container" class="overflow-auto flex-auto relative" style="min-height: 400px;" {
             table class="f6 w-100" cellspacing="0" style="min-width: 800px;" {
                 thead {
                     tr {
                         @for column in &dyn_table.columns {
-                            th class="fw6 bb b--white-20 tl pv3 pr4 pl3 white-90 bg-dark-orange" style="position: sticky; top: 0; z-index: 10; min-width: 120px;" { (column.name) }
+                            th class="fw6 bb b--white-20 pv3 pr4 pl3 white-90 bg-dark-orange relative" style="position: sticky; top: 0; z-index: 10; min-width: 120px;" {
+                                div class="flex items-center justify-between" {
+                                    span { (column.name) }
+                                    // Filter icon for each column
+                                    button
+                                        class="bn bg-transparent pointer pa1 ml2 filter-trigger"
+                                        onclick={"toggleFilter('" (column.name) "', '" (database) "', '" (table) "')"}
+                                        title="Filter column"
+                                        {
+                                        svg class="w1 h1 white-70 hover-white" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" {
+                                            path d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z" {}
+                                        }
+                                    }
+                                }
+                                // Filter flyout panel (one per column, initially hidden)
+                                div id={"filter-flyout-" (column.name)} class="absolute dn bg-near-black ba b--white-20 br2 shadow-3" style="top: 100%; left: 0; width: 280px; max-height: 400px; z-index: 200; margin-top: 0.5rem;" {
+                                    // Header
+                                    div class="pa3 bb b--white-20 flex items-center justify-between" {
+                                        h4 class="f6 fw6 white-90 ma0" { "Filter: " (column.name) }
+                                        button
+                                            class="bn bg-transparent white-70 hover-white pointer f4 pa0"
+                                            onclick={"document.getElementById('filter-flyout-" (column.name) "').classList.add('dn')"}
+                                            { "×" }
+                                    }
+                                    // Search box
+                                    div class="pa2 bb b--white-20" {
+                                        input
+                                            type="text"
+                                            id={"search_" (column.name)}
+                                            name="search"
+                                            placeholder="Search values..."
+                                            class="input-reset pa2 w-100 f6 ba b--white-30 br2 white-80 bg-black-20"
+                                            hx-get={"/database/tables/table/column/values?database=" (database) "&table=" (table) "&column=" (column.name)}
+                                            hx-trigger="keyup changed delay:300ms"
+                                            hx-target={"#filter-values-" (column.name)}
+                                            hx-include="this"
+                                            hx-swap="innerHTML";
+                                    }
+                                    // Checkbox list container (scrollable)
+                                    div id={"filter-values-" (column.name)} class="overflow-y-auto pa2" style="max-height: 250px;"
+                                        hx-get={"/database/tables/table/column/values?database=" (database) "&table=" (table) "&column=" (column.name)}
+                                        hx-trigger="load"
+                                        hx-swap="innerHTML" {
+                                        // Values will be loaded here
+                                    }
+                                    // Apply button
+                                    div class="pa2 bt b--white-20" {
+                                        button
+                                            class="bn bg-orange white br2 pa2 w-100 pointer hover-bg-dark-orange f6 fw6"
+                                            hx-get={"/database/tables/table?database=" (database) "&table=" (table)}
+                                            hx-trigger="click"
+                                            hx-target="#table-container"
+                                            hx-include="[name^='filter_']:checked"
+                                            hx-swap="outerHTML"
+                                            { "Apply Filter" }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
-                tbody id="table-body" class="lh-copy" {
+                tbody id="table-body-container" class="lh-copy" {
                     @for row_idx in 0..dyn_table.row_count() {
                         tr class="hover-bg-orange-10" {
                             @for col_idx in 0..dyn_table.column_count() {
@@ -195,6 +282,7 @@ pub async fn get_table_as_html(
                         tr
                             hx-get={"/database/tables/table/rows?database=" (database) "&table=" (table) "&offset=" (next_offset)}
                             hx-trigger="intersect once"
+                            hx-include="[name^='filter_']"
                             hx-swap="outerHTML" {
                             td colspan="999" class="tc pv3 white-50" {
                                 "Loading more..."
@@ -204,6 +292,24 @@ pub async fn get_table_as_html(
                 }
             }
         }
+        // Add JavaScript for toggling filter flyouts
+        (PreEscaped(r#"<script>
+            function toggleFilter(columnName, database, table) {
+                // Close all other flyouts first
+                const allFlyouts = document.querySelectorAll('[id^="filter-flyout-"]');
+                allFlyouts.forEach(flyout => {
+                    if (flyout.id !== 'filter-flyout-' + columnName) {
+                        flyout.classList.add('dn');
+                    }
+                });
+                
+                // Toggle the current flyout
+                const flyout = document.getElementById('filter-flyout-' + columnName);
+                if (flyout) {
+                    flyout.classList.toggle('dn');
+                }
+            }
+        </script>"#))
     };
 
     Ok(markup)
@@ -214,11 +320,12 @@ pub async fn get_table_rows_html(
     database: &str,
     table: &str,
     offset: usize,
+    filters: &std::collections::HashMap<String, String>,
 ) -> Result<maud::Markup, Box<dyn std::error::Error>> {
     const PAGE_SIZE: usize = 40;
 
     // Get the table data as DynTable
-    let dyn_table = db::get_dyn_table(config, database, table, PAGE_SIZE, offset).await?;
+    let dyn_table = db::get_dyn_table(config, database, table, PAGE_SIZE, offset, filters).await?;
 
     let next_offset = offset + PAGE_SIZE;
     let has_more_rows = dyn_table.row_count() == PAGE_SIZE;
@@ -236,10 +343,62 @@ pub async fn get_table_rows_html(
             tr
                 hx-get={"/database/tables/table/rows?database=" (database) "&table=" (table) "&offset=" (next_offset)}
                 hx-trigger="intersect once"
+                hx-include="[name^='filter_']"
                 hx-swap="outerHTML" {
                 td colspan="999" class="tc pv3 white-50" {
                     "Loading more..."
                 }
+            }
+        }
+    };
+
+    Ok(markup)
+}
+
+#[get("database/tables/table/column/values")]
+pub async fn get_column_values(
+    params: web::Query<std::collections::HashMap<String, String>>,
+    config: web::Data<config::Server>,
+) -> AwResult<maud::Markup> {
+    let db_name = params.get("database").map(|s| s.as_str()).unwrap_or("");
+    let table = params.get("table").map(|s| s.as_str()).unwrap_or("");
+    let column = params.get("column").map(|s| s.as_str()).unwrap_or("");
+    let offset = params
+        .get("offset")
+        .and_then(|s| s.parse::<usize>().ok())
+        .unwrap_or(0);
+    let search = params.get("search").map(|s| s.as_str());
+
+    const PAGE_SIZE: usize = 40;
+
+    let dyn_table =
+        db::get_distinct_column_values(&config, db_name, table, column, PAGE_SIZE, offset, search)
+            .await
+            .unwrap();
+
+    let next_offset = offset + PAGE_SIZE;
+    let has_more = dyn_table.row_count() == PAGE_SIZE;
+
+    // Build checkbox list for distinct values
+    let markup = html! {
+        @for row_idx in 0..dyn_table.row_count() {
+            @let value = dyn_table.get_value_as_string(row_idx, 0);
+            label class="db pv2 ph2 hover-bg-white-10 pointer" {
+                input
+                    type="checkbox"
+                    name={"filter_" (column)}
+                    value={(value)}
+                    class="mr2";
+                span class="white-80" { (value) }
+            }
+        }
+        @if has_more {
+            div
+                hx-get={"/database/tables/table/column/values?database=" (db_name) "&table=" (table) "&column=" (column) "&offset=" (next_offset) @if let Some(s) = search { "&search=" (s) }}
+                hx-trigger="intersect once"
+                hx-swap="outerHTML"
+                class="tc pv2 white-50 f7" {
+                "Load more..."
             }
         }
     };

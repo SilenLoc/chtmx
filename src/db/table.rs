@@ -361,11 +361,28 @@ pub async fn get_dyn_table(
     table: &str,
     limit: usize,
     offset: usize,
+    filters: &std::collections::HashMap<String, String>,
 ) -> Result<DynTable, Box<dyn std::error::Error>> {
+    // Build WHERE clause from filters
+    let where_clause = if filters.is_empty() {
+        String::new()
+    } else {
+        let conditions: Vec<String> = filters
+            .iter()
+            .map(|(col, val)| {
+                // Escape single quotes in the filter value
+                let escaped_val = val.replace('\'', "\\'");
+                // Use LIKE for partial matching (case-insensitive)
+                format!("`{}` ILIKE '%{}%'", col, escaped_val)
+            })
+            .collect();
+        format!(" WHERE {}", conditions.join(" AND "))
+    };
+
     // Query ClickHouse with TSVWithNames format (tab-separated with header row)
     let query = format!(
-        "SELECT * FROM {}.{} LIMIT {} OFFSET {} FORMAT TSVWithNames",
-        database, table, limit, offset
+        "SELECT * FROM {}.{}{} LIMIT {} OFFSET {} FORMAT TSVWithNames",
+        database, table, where_clause, limit, offset
     );
 
     // Build the HTTP client
@@ -405,4 +422,71 @@ pub async fn get_dyn_table(
     let columns = convert_rows_to_typed_columns(&fields, &rows);
 
     Ok(DynTable::new(table.to_string(), columns))
+}
+
+/// Get distinct values for a specific column
+pub async fn get_distinct_column_values(
+    config: &config::Server,
+    database: &str,
+    table: &str,
+    column: &str,
+    limit: usize,
+    offset: usize,
+    search: Option<&str>,
+) -> Result<DynTable, Box<dyn std::error::Error>> {
+    // Build WHERE clause for search filter if provided
+    let where_clause = if let Some(search_term) = search {
+        if !search_term.is_empty() {
+            let escaped = search_term.replace('\'', "\\'");
+            format!(" WHERE `{}` ILIKE '%{}%'", column, escaped)
+        } else {
+            String::new()
+        }
+    } else {
+        String::new()
+    };
+
+    // Query for distinct values
+    let query = format!(
+        "SELECT DISTINCT `{}` FROM {}.{}{} ORDER BY `{}` LIMIT {} OFFSET {} FORMAT TSVWithNames",
+        column, database, table, where_clause, column, limit, offset
+    );
+
+    // Build the HTTP client
+    let client = reqwest::Client::new();
+
+    // Build the request
+    let mut request = client
+        .post(config.clickhouse_url())
+        .query(&[("user", config.clickhouse_user())])
+        .body(query);
+
+    // Add password if present
+    if !config.clickhouse_password().is_empty() {
+        request = request.query(&[("password", config.clickhouse_password())]);
+    }
+
+    let response = request.send().await?;
+
+    if !response.status().is_success() {
+        let error_text = response.text().await?;
+        return Err(format!("ClickHouse error: {}", error_text).into());
+    }
+
+    let tsv_data = response.text().await?;
+
+    let mut lines = tsv_data.lines();
+
+    let headers_line = lines.next().ok_or("Empty response from ClickHouse")?;
+    let fields: Vec<String> = headers_line.split('\t').map(|s| s.to_string()).collect();
+
+    // Remaining lines are data rows
+    let rows: Vec<Vec<String>> = lines
+        .map(|line| line.split('\t').map(|s| s.to_string()).collect())
+        .collect();
+
+    // Convert rows to typed columns
+    let columns = convert_rows_to_typed_columns(&fields, &rows);
+
+    Ok(DynTable::new(column.to_string(), columns))
 }

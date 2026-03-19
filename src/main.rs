@@ -81,6 +81,7 @@ async fn main() -> std::io::Result<()> {
             .service(view::databases::get_tables)
             .service(view::databases::get_table)
             .service(view::databases::get_table_rows)
+            .service(view::databases::get_column_values)
             .service(upload::upload_csv)
     })
     .bind(bind_address)?
