@@ -12,7 +12,7 @@ VERSION=$1
 # Update Cargo.toml
 sed -i "s/^version = \".*\"/version = \"$VERSION\"/" Cargo.toml
 
-# Update Cargo.lock to reflect the new version
-cargo update
+# Update Cargo.lock to reflect the new version (only update chtmx package)
+cargo update -p chtmx
 
 echo "Updated Cargo.toml and Cargo.lock to version $VERSION"
