@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 actix-multipart = "0.7"
 actix-web = "4"
+chrono = "0.4"
 clickhouse = "0.12.2"
 csv = "1.4.0"
 env_logger = "0.11"

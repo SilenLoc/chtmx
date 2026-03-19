@@ -170,7 +170,7 @@ pub async fn get_table_as_html(
     let dyn_table = db::get_dyn_table(config, database, table, PAGE_SIZE, offset).await?;
 
     let next_offset = offset + PAGE_SIZE;
-    let has_more_rows = dyn_table.rows.len() == PAGE_SIZE;
+    let has_more_rows = dyn_table.row_count() == PAGE_SIZE;
 
     // Build styled HTML with Tachyons classes (dark theme with white text)
     let markup = html! {
@@ -178,16 +178,16 @@ pub async fn get_table_as_html(
             table class="f6 w-100" cellspacing="0" style="min-width: 800px;" {
                 thead {
                     tr {
-                        @for header in &dyn_table.fields {
-                            th class="fw6 bb b--white-20 tl pv3 pr4 pl3 white-90 bg-dark-orange" style="position: sticky; top: 0; z-index: 10; min-width: 120px;" { (header) }
+                        @for column in &dyn_table.columns {
+                            th class="fw6 bb b--white-20 tl pv3 pr4 pl3 white-90 bg-dark-orange" style="position: sticky; top: 0; z-index: 10; min-width: 120px;" { (column.name) }
                         }
                     }
                 }
                 tbody id="table-body" class="lh-copy" {
-                    @for row in &dyn_table.rows {
+                    @for row_idx in 0..dyn_table.row_count() {
                         tr class="hover-bg-orange-10" {
-                            @for cell in row {
-                                td class="pv3 pr4 pl3 bb b--white-10 white-80 tl" { (cell) }
+                            @for col_idx in 0..dyn_table.column_count() {
+                                td class="pv3 pr4 pl3 bb b--white-10 white-80 tl" { (dyn_table.get_value_as_string(row_idx, col_idx)) }
                             }
                         }
                     }
@@ -221,14 +221,14 @@ pub async fn get_table_rows_html(
     let dyn_table = db::get_dyn_table(config, database, table, PAGE_SIZE, offset).await?;
 
     let next_offset = offset + PAGE_SIZE;
-    let has_more_rows = dyn_table.rows.len() == PAGE_SIZE;
+    let has_more_rows = dyn_table.row_count() == PAGE_SIZE;
 
     // Build just the rows (no table wrapper or header)
     let markup = html! {
-        @for row in &dyn_table.rows {
+        @for row_idx in 0..dyn_table.row_count() {
             tr class="hover-bg-orange-10" {
-                @for cell in row {
-                    td class="pv3 pr4 pl3 bb b--white-10 white-80 tl" { (cell) }
+                @for col_idx in 0..dyn_table.column_count() {
+                    td class="pv3 pr4 pl3 bb b--white-10 white-80 tl" { (dyn_table.get_value_as_string(row_idx, col_idx)) }
                 }
             }
         }
