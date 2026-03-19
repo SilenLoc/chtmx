@@ -179,7 +179,7 @@ pub async fn get_table_as_html(
                 thead {
                     tr {
                         @for header in &dyn_table.fields {
-                            th class="fw6 bb b--white-20 tl pb3 pr4 pl3 white-90 bg-dark-orange" style="position: sticky; top: 0; z-index: 10; min-width: 120px;" { (header) }
+                            th class="fw6 bb b--white-20 tl pv3 pr4 pl3 white-90 bg-dark-orange" style="position: sticky; top: 0; z-index: 10; min-width: 120px;" { (header) }
                         }
                     }
                 }
