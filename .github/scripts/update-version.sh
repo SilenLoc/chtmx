@@ -12,4 +12,7 @@ VERSION=$1
 # Update Cargo.toml
 sed -i "s/^version = \".*\"/version = \"$VERSION\"/" Cargo.toml
 
-echo "Updated Cargo.toml to version $VERSION"
+# Update Cargo.lock to reflect the new version
+cargo update
+
+echo "Updated Cargo.toml and Cargo.lock to version $VERSION"
