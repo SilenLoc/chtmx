@@ -5,7 +5,6 @@ use log::info;
 mod assets;
 mod config;
 mod db;
-mod markdown_parser;
 mod upload;
 mod view;
 

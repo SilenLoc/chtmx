@@ -46,7 +46,6 @@ pub async fn create_table_from_csv(
     Ok(())
 }
 
-#[allow(unused)]
 pub async fn create_dyn_table(table: DynTable, ch: Ch) -> Result<(), Box<dyn std::error::Error>> {
     // Build column definitions with types (all as String)
     let columns_with_types = table
@@ -92,14 +91,12 @@ pub async fn create_dyn_table(table: DynTable, ch: Ch) -> Result<(), Box<dyn std
     Ok(())
 }
 
-#[allow(unused)]
 pub struct DynTable {
     pub name: String,
     pub fields: Vec<String>,
     pub rows: Vec<Vec<String>>,
 }
 
-#[allow(unused)]
 impl DynTable {
     pub fn new(name: String, fields: Vec<String>, rows: Vec<Vec<String>>) -> Self {
         Self { name, fields, rows }
@@ -141,30 +138,18 @@ pub async fn all_tables(ch: Ch, database: &str) -> Vec<Table> {
     tables
 }
 
-pub async fn get_table_as_markdown_paginated(
+pub async fn get_dyn_table(
     config: &config::Server,
     database: &str,
     table: &str,
     limit: usize,
     offset: usize,
-) -> Result<String, Box<dyn std::error::Error>> {
+) -> Result<DynTable, Box<dyn std::error::Error>> {
+    // Query ClickHouse with TSVWithNames format (tab-separated with header row)
     let query = format!(
-        "SELECT * FROM {}.{} LIMIT {} OFFSET {} FORMAT Markdown",
+        "SELECT * FROM {}.{} LIMIT {} OFFSET {} FORMAT TSVWithNames",
         database, table, limit, offset
     );
-    get_as_markdown(config, &query).await
-}
-
-pub async fn get_as_markdown(
-    config: &config::Server,
-    query: &str,
-) -> Result<String, Box<dyn std::error::Error>> {
-    // Ensure the query ends with FORMAT Markdown
-    let query_with_format = if query.trim().to_uppercase().contains("FORMAT") {
-        query.to_string()
-    } else {
-        format!("{} FORMAT Markdown", query.trim())
-    };
 
     // Build the HTTP client
     let client = reqwest::Client::new();
@@ -173,23 +158,31 @@ pub async fn get_as_markdown(
     let mut request = client
         .post(config.clickhouse_url())
         .query(&[("user", config.clickhouse_user())])
-        .body(query_with_format);
+        .body(query);
 
     // Add password if present
     if !config.clickhouse_password().is_empty() {
         request = request.query(&[("password", config.clickhouse_password())]);
     }
 
-    // Execute the request
     let response = request.send().await?;
 
-    // Check for errors
     if !response.status().is_success() {
         let error_text = response.text().await?;
         return Err(format!("ClickHouse error: {}", error_text).into());
     }
 
-    // Get the response body as text
-    let markdown = response.text().await?;
-    Ok(markdown)
+    let tsv_data = response.text().await?;
+
+    let mut lines = tsv_data.lines();
+
+    let headers_line = lines.next().ok_or("Empty response from ClickHouse")?;
+    let fields: Vec<String> = headers_line.split('\t').map(|s| s.to_string()).collect();
+
+    // Remaining lines are data rows
+    let rows: Vec<Vec<String>> = lines
+        .map(|line| line.split('\t').map(|s| s.to_string()).collect())
+        .collect();
+
+    Ok(DynTable::new(table.to_string(), fields, rows))
 }

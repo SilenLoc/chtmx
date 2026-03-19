@@ -2,14 +2,14 @@ use actix_web::Result as AwResult;
 use actix_web::{HttpRequest, get, web};
 use maud::html;
 
-use crate::{config, db, markdown_parser};
+use crate::{config, db};
 
 #[get("/databases")]
 pub async fn databases_page(req: HttpRequest, ch: web::Data<db::Ch>) -> AwResult<maud::Markup> {
     let databases = db::all_databases(ch.get_ref().clone()).await;
 
     let content = html! {
-        div class="w-100" {
+        div class="w-100 flex flex-column" style="height: 100%;" {
             // Control area at the very top - full width with horizontal layout
             div class="bg-black-70 pa3" {
                 div class="mw8 center" {
@@ -44,13 +44,13 @@ pub async fn databases_page(req: HttpRequest, ch: web::Data<db::Ch>) -> AwResult
                 }
             }
 
-            // Main content area
-            div class="w-100 ph3 mt4" {
-                h1 class="f2 fw2 white-90 mb3 lh-title" { "Database Details" }
+            // Main content area - flex-auto to fill remaining space
+            div class="w-100 ph3 mt4 flex-auto flex flex-column" {
+                h1 id="db-heading" class="f4 fw6 white-90 mb3 lh-title" { "Select a database" }
 
-                // Placeholder for future functionality
-                div id="db-content" class="db-content bg-white-10 pa4 br3 mt4" {
-                    p class="white-70 f6 i tc" {
+                // Placeholder for future functionality - flex-auto to fill remaining space
+                div id="db-content" class="db-content bg-white-10 br3 flex-auto flex flex-column" style="overflow: hidden;" {
+                    p class="white-70 f6 i tc pa4" {
                         "Select a database and table to view details"
                     }
                 }
@@ -80,6 +80,12 @@ pub async fn get_tables(
     let tables = db::all_tables(ch.get_ref().clone(), db_name).await;
 
     Ok(html! {
+     // Update the heading with the database name
+     h1 id="db-heading"
+        class="f4 fw6 white-90 mb3 lh-title"
+        hx-swap-oob="true" {
+        (db_name)
+     }
 
      div class="mr3 flex" style="min-width: 250px;" {
         label class="db fw6 lh-copy f6 mr2 white-90" for="table-select" {
@@ -148,37 +154,25 @@ pub async fn get_table_as_html(
 ) -> Result<maud::Markup, Box<dyn std::error::Error>> {
     const PAGE_SIZE: usize = 40;
 
-    // Get the markdown representation with pagination
-    let markdown =
-        db::get_table_as_markdown_paginated(config, database, table, PAGE_SIZE, offset).await?;
-
-    // Parse markdown table using the parser
-    let parsed_table = markdown_parser::MarkdownTable::parse(&markdown);
-
-    let Some(table_data) = parsed_table else {
-        return Ok(html! {
-            div class="pa4" {
-                p class="white-70" { "No data available" }
-            }
-        });
-    };
+    // Get the table data as DynTable
+    let dyn_table = db::get_dyn_table(config, database, table, PAGE_SIZE, offset).await?;
 
     let next_offset = offset + PAGE_SIZE;
-    let has_more_rows = table_data.rows.len() == PAGE_SIZE;
+    let has_more_rows = dyn_table.rows.len() == PAGE_SIZE;
 
     // Build styled HTML with Tachyons classes (dark theme with white text)
     let markup = html! {
-        div class="overflow-auto" style="min-height: 20vh; max-height: 50vh;" {
+        div class="overflow-auto flex-auto" style="min-height: 400px;" {
             table class="f6 w-100" cellspacing="0" style="min-width: 800px;" {
                 thead {
                     tr {
-                        @for header in &table_data.headers {
+                        @for header in &dyn_table.fields {
                             th class="fw6 bb b--white-20 tl pb3 pr4 pl3 white-90 bg-black-80" style="position: sticky; top: 0; z-index: 10; min-width: 120px;" { (header) }
                         }
                     }
                 }
                 tbody id="table-body" class="lh-copy" {
-                    @for row in &table_data.rows {
+                    @for row in &dyn_table.rows {
                         tr class="hover-bg-white-10" {
                             @for cell in row {
                                 td class="pv3 pr4 pl3 bb b--white-10 white-80 tl" { (cell) }
@@ -211,23 +205,15 @@ pub async fn get_table_rows_html(
 ) -> Result<maud::Markup, Box<dyn std::error::Error>> {
     const PAGE_SIZE: usize = 40;
 
-    // Get the markdown representation with pagination
-    let markdown =
-        db::get_table_as_markdown_paginated(config, database, table, PAGE_SIZE, offset).await?;
-
-    // Parse markdown table using the parser
-    let parsed_table = markdown_parser::MarkdownTable::parse(&markdown);
-
-    let Some(table_data) = parsed_table else {
-        return Ok(html! {});
-    };
+    // Get the table data as DynTable
+    let dyn_table = db::get_dyn_table(config, database, table, PAGE_SIZE, offset).await?;
 
     let next_offset = offset + PAGE_SIZE;
-    let has_more_rows = table_data.rows.len() == PAGE_SIZE;
+    let has_more_rows = dyn_table.rows.len() == PAGE_SIZE;
 
     // Build just the rows (no table wrapper or header)
     let markup = html! {
-        @for row in &table_data.rows {
+        @for row in &dyn_table.rows {
             tr class="hover-bg-white-10" {
                 @for cell in row {
                     td class="pv3 pr4 pl3 bb b--white-10 white-80 tl" { (cell) }

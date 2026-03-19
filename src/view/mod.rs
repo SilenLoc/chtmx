@@ -11,12 +11,71 @@ pub mod upload;
 #[get("/")]
 pub async fn index(req: HttpRequest) -> AwResult<maud::Markup> {
     let content = html! {
-        div {
-            h1 class="f2 f1-l fw2 white-90 mb0 lh-title" { "This is your super impressive headline" }
-            h2 class="fw1 f3 white-80 mt3 mb4" { "Now a subheadline where explain your wonderful new startup even more" }
-            a class="f6 no-underline grow dib v-mid bg-blue white ba b--blue ph3 pv2 mb3" href="/" { "Call to Action" }
-            span class="dib v-mid ph3 white-70 mb3" { "or" }
-            a class="f6 no-underline grow dib v-mid white ba b--white ph3 pv2 mb3" href="" { "Secondary call to action" }
+        div class="tl" {
+            h1 class="f2 fw6 white mb2 lh-title" { "CHTMX" }
+            p class="f5 white-70 mt2 mb4 lh-copy" { 
+                "Testing the capabilities of ClickHouse, HTMX, and Rust"
+            }
+            
+            h2 class="f4 fw6 white-90 mt4 mb3 bb b--white-20 pb2" { "Features" }
+            
+            div class="flex flex-wrap nl2 nr2" {
+                // Databases Panel
+                a href="/databases"
+                  hx-get="/databases"
+                  hx-target="#feature"
+                  hx-swap="innerHTML"
+                  hx-push-url="true"
+                  class="no-underline w-50-ns w-100 pa2" {
+                    div class="bg-white-10 white hover-bg-white-20 br2 pa3 h-100" {
+                        div class="f3 mb2" { "🗄️" }
+                        h3 class="f5 fw6 mb2 white" { "Databases" }
+                        p class="f6 white-60 lh-copy ma0" { "Browse ClickHouse databases and tables" }
+                    }
+                }
+                
+                // Upload CSV Panel
+                a href="/upload"
+                  hx-get="/upload"
+                  hx-target="#feature"
+                  hx-swap="innerHTML"
+                  hx-push-url="true"
+                  class="no-underline w-50-ns w-100 pa2" {
+                    div class="bg-white-10 white hover-bg-white-20 br2 pa3 h-100" {
+                        div class="f3 mb2" { "📤" }
+                        h3 class="f5 fw6 mb2 white" { "Upload CSV" }
+                        p class="f6 white-60 lh-copy ma0" { "Import CSV files into ClickHouse" }
+                    }
+                }
+                
+                // How it Works Panel
+                a href="/how-it-works"
+                  hx-get="/how-it-works"
+                  hx-target="#feature"
+                  hx-swap="innerHTML"
+                  hx-push-url="true"
+                  class="no-underline w-50-ns w-100 pa2" {
+                    div class="bg-white-10 white hover-bg-white-20 br2 pa3 h-100" {
+                        div class="f3 mb2" { "⚙️" }
+                        h3 class="f5 fw6 mb2 white" { "How it Works" }
+                        p class="f6 white-60 lh-copy ma0" { "Learn about the tech stack" }
+                    }
+                }
+                
+                // About Panel
+                a href="/about"
+                  hx-get="/about"
+                  hx-target="#feature"
+                  hx-swap="innerHTML"
+                  hx-push-url="true"
+                  class="no-underline w-50-ns w-100 pa2" {
+                    div class="bg-white-10 white hover-bg-white-20 br2 pa3 h-100" {
+                        div class="f3 mb2" { "ℹ️" }
+                        h3 class="f5 fw6 mb2 white" { "About" }
+                        p class="f6 white-60 lh-copy ma0" { "More information about this project" }
+                    }
+                }
+            }
         }
     };
 
@@ -39,8 +98,8 @@ pub fn render_layout(main_content: &maud::Markup) -> maud::Markup {
                 link rel="stylesheet" href="/assets/t.css";
                 script src="/assets/h.js" {}
             }
-            body class="w-100 min-h-100 sans-serif ma0" {
-                nav class="dt w-100 bg-black-80 fixed top-0 left-0 right-0 z-1" {
+            body class="w-100 sans-serif ma0 bg-black white" style="height: 100vh; overflow: hidden;" {
+                nav class="dt w-100 bg-black bb b--white-20 fixed top-0 left-0 right-0 z-1" {
                     div class="dtc v-mid pa3" {
                         a href="/" class="link white-90 hover-white no-underline fw6 f4" {
                             "CHTMX"
@@ -79,11 +138,8 @@ pub fn render_layout(main_content: &maud::Markup) -> maud::Markup {
                         }
                     }
                 }
-                div class="fixed top-0 left-0 right-0 bottom-0 cover bg-center" style="background-image: url(/assets/background.jpg); z-index: -1;" {
-                    div class="bg-black-10 h-100" {}
-                }
-                main id="feature" class="tc ph3 pv4 flex items-center justify-center" style="padding-top: 5rem; min-height: 100vh;" {
-                    div class="w-100" {
+                main id="feature" class="flex flex-column" style="padding-top: 5rem; padding-left: 10px; padding-right: 10px; padding-bottom: 10px; height: 100vh; overflow: hidden;" {
+                    div class="w-100 flex-auto" style="overflow: hidden; display: flex; flex-direction: column;" {
                         (main_content)
                     }
                 }
