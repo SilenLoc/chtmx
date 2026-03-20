@@ -4,6 +4,29 @@ use maud::{PreEscaped, html};
 
 use crate::{config, db};
 
+/// Renders a filter icon button with an optional active indicator dot
+fn filter_icon_button(
+    column_name: &str,
+    database: &str,
+    table: &str,
+    has_filter: bool,
+) -> maud::Markup {
+    html! {
+        button
+            class="bn bg-transparent pointer pa1 ml2 filter-trigger relative"
+            onclick={"toggleFilter('" (column_name) "', '" (database) "', '" (table) "')"}
+            title="Filter column"
+            {
+            svg class={"hover-white " @if has_filter { "white" } @else { "white-70" }} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" style="width: 1.25rem; height: 1.25rem;" {
+                path d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z" {}
+            }
+            @if has_filter {
+                span class="absolute bg-orange br-100" style="width: 7px; height: 7px; top: 2px; right: 2px;" {}
+            }
+        }
+    }
+}
+
 #[get("/databases")]
 pub async fn databases_page(req: HttpRequest, ch: web::Data<db::Ch>) -> AwResult<maud::Markup> {
     let databases = db::all_databases(ch.get_ref().clone()).await;
@@ -38,6 +61,11 @@ pub async fn databases_page(req: HttpRequest, ch: web::Data<db::Ch>) -> AwResult
                     // Table dropdown container (will be populated via HTMX)
                     div id="table-select-container" style="min-width: 250px;" {
                         // Tables dropdown will be loaded here
+                    }
+
+                    // Toggle controls container (will be populated via HTMX)
+                    div id="toggle-controls-container" class="ml3" {
+                        // Toggle controls will be loaded here
                     }
                 }
             }
@@ -124,6 +152,7 @@ pub async fn get_table(
 
     let mut db_name = String::new();
     let mut table_name = String::new();
+    let mut show_types = false;
     let mut filters: std::collections::HashMap<String, Vec<String>> =
         std::collections::HashMap::new();
 
@@ -136,6 +165,7 @@ pub async fn get_table(
             match key {
                 "database" => db_name = value,
                 "table" => table_name = value,
+                "show_types" => show_types = value == "true" || value == "1",
                 k if k.starts_with("filter_") => {
                     if !value.is_empty() {
                         let col = k.strip_prefix("filter_").unwrap();
@@ -147,7 +177,7 @@ pub async fn get_table(
         }
     }
 
-    let table_html = get_table_as_html(&config, &db_name, &table_name, 0, &filters)
+    let table_html = get_table_as_html(&config, &db_name, &table_name, 0, show_types, &filters)
         .await
         .unwrap();
 
@@ -158,6 +188,31 @@ pub async fn get_table(
            class="f4 fw6 white-90 mb3 lh-title"
            hx-swap-oob="true" {
             (db_name) span class="white-50" { " / " } (table_name)
+        }
+
+        // Update the toggle controls
+        div id="toggle-controls-container"
+            class="ml3"
+            hx-swap-oob="true" {
+            label class="flex items-center pointer" {
+                input
+                    type="checkbox"
+                    id="show-types-toggle"
+                    class="mr2"
+                    checked[show_types]
+                    hx-get={"/database/tables/table?database=" (&db_name) "&table=" (&table_name) "&show_types=" (!show_types)
+                        @for (col, vals) in &filters {
+                            @for val in vals {
+                                "&filter_" (col) "=" (val)
+                            }
+                        }
+                    }
+                    hx-trigger="change"
+                    hx-target="#table-container"
+                    hx-swap="outerHTML"
+                    hx-push-url="true";
+                span class="f6 white-90 fw6" { "Show Types" }
+            }
         }
 
         // The actual table content
@@ -176,6 +231,7 @@ pub async fn get_table_rows(
     let mut db_name = String::new();
     let mut table_name = String::new();
     let mut offset = 0;
+    let mut show_types = false;
     let mut filters: std::collections::HashMap<String, Vec<String>> =
         std::collections::HashMap::new();
 
@@ -189,6 +245,7 @@ pub async fn get_table_rows(
                 "database" => db_name = value,
                 "table" => table_name = value,
                 "offset" => offset = value.parse::<usize>().unwrap_or(0),
+                "show_types" => show_types = value == "true" || value == "1",
                 k if k.starts_with("filter_") => {
                     if !value.is_empty() {
                         let col = k.strip_prefix("filter_").unwrap();
@@ -200,9 +257,10 @@ pub async fn get_table_rows(
         }
     }
 
-    let table_html = get_table_rows_html(&config, &db_name, &table_name, offset, &filters)
-        .await
-        .unwrap();
+    let table_html =
+        get_table_rows_html(&config, &db_name, &table_name, offset, show_types, &filters)
+            .await
+            .unwrap();
 
     Ok(table_html)
 }
@@ -212,6 +270,7 @@ pub async fn get_table_as_html(
     database: &str,
     table: &str,
     offset: usize,
+    show_types: bool,
     filters: &std::collections::HashMap<String, Vec<String>>,
 ) -> Result<maud::Markup, Box<dyn std::error::Error>> {
     const PAGE_SIZE: usize = 40;
@@ -238,7 +297,7 @@ pub async fn get_table_as_html(
                     }
                     button
                         class="bn bg-orange white br2 ph3 pv2 pointer hover-bg-dark-orange f6 fw6"
-                        hx-get={"/database/tables/table?database=" (database) "&table=" (table)}
+                        hx-get={"/database/tables/table?database=" (database) "&table=" (table) @if show_types { "&show_types=true" }}
                         hx-trigger="click"
                         hx-target="#table-container"
                         hx-swap="outerHTML"
@@ -252,21 +311,15 @@ pub async fn get_table_as_html(
                         @for column in &dyn_table.columns {
                             th class="fw6 bb b--white-20 pv3 pr4 pl3 white-90 bg-dark-orange relative" style="position: sticky; top: 0; z-index: 10; min-width: 120px;" {
                                 div class="flex items-center justify-between" {
-                                    span { (column.name) }
-                                    // Filter icon for each column
-                                    @let has_filter = filters.contains_key(&column.name);
-                                    button
-                                        class="bn bg-transparent pointer pa1 ml2 filter-trigger"
-                                        onclick={"toggleFilter('" (column.name) "', '" (database) "', '" (table) "')"}
-                                        title="Filter column"
-                                        {
-                                        svg class={"w1 h1 hover-white " @if has_filter { "white" } @else { "white-70" }} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" {
-                                            path d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z" {}
-                                        }
-                                        @if has_filter {
-                                            span class="absolute top-0 right-0 white bg-orange br-100" style="width: 6px; height: 6px;" {}
+                                    div class="flex items-center" {
+                                        span { (column.name) }
+                                        @if show_types {
+                                            span class="f7 white-70 fw4 ml2" { "(" (column.clickhouse_type()) ")" }
                                         }
                                     }
+                                    // Filter icon for each column
+                                    @let has_filter = filters.contains_key(&column.name);
+                                    (filter_icon_button(&column.name, database, table, has_filter))
                                 }
                                 // Filter flyout panel (one per column, initially hidden)
                                 div id={"filter-flyout-" (column.name)} class="absolute dn bg-near-black ba b--white-20 br2 shadow-3" style="top: 100%; right: 0; width: 280px; max-height: 400px; z-index: 200; margin-top: 0.5rem;" {
@@ -331,7 +384,7 @@ pub async fn get_table_as_html(
                                     div class="pa2 bt b--white-20" {
                                         button
                                             class="bn bg-orange white br2 pa2 w-100 pointer hover-bg-dark-orange f6 fw6"
-                                            hx-get={"/database/tables/table?database=" (database) "&table=" (table)}
+                                            hx-get={"/database/tables/table?database=" (database) "&table=" (table) @if show_types { "&show_types=true" }}
                                             hx-trigger="click"
                                             hx-target="#table-container"
                                             hx-include="[name^='filter_']:checked"
@@ -354,7 +407,7 @@ pub async fn get_table_as_html(
                     }
                     @if has_more_rows {
                         tr
-                            hx-get={"/database/tables/table/rows?database=" (database) "&table=" (table) "&offset=" (next_offset)}
+                            hx-get={"/database/tables/table/rows?database=" (database) "&table=" (table) "&offset=" (next_offset) @if show_types { "&show_types=true" }}
                             hx-trigger="intersect once"
                             hx-include="[name^='filter_']"
                             hx-swap="outerHTML" {
@@ -410,6 +463,7 @@ pub async fn get_table_rows_html(
     database: &str,
     table: &str,
     offset: usize,
+    show_types: bool,
     filters: &std::collections::HashMap<String, Vec<String>>,
 ) -> Result<maud::Markup, Box<dyn std::error::Error>> {
     const PAGE_SIZE: usize = 40;
@@ -431,7 +485,7 @@ pub async fn get_table_rows_html(
         }
         @if has_more_rows {
             tr
-                hx-get={"/database/tables/table/rows?database=" (database) "&table=" (table) "&offset=" (next_offset)}
+                hx-get={"/database/tables/table/rows?database=" (database) "&table=" (table) "&offset=" (next_offset) @if show_types { "&show_types=true" }}
                 hx-trigger="intersect once"
                 hx-include="[name^='filter_']"
                 hx-swap="outerHTML" {
@@ -459,6 +513,8 @@ pub async fn get_column_values(
     let mut offset = 0;
     let mut search = None;
     let mut selected_values: Vec<String> = Vec::new();
+    let mut filters: std::collections::HashMap<String, Vec<String>> =
+        std::collections::HashMap::new();
 
     // Parse query string
     for pair in query_str.split('&') {
@@ -473,12 +529,15 @@ pub async fn get_column_values(
                 "offset" => offset = value.parse::<usize>().unwrap_or(0),
                 "search" => search = Some(value),
                 k if k.starts_with("selected_") => {
-                    // Collect currently selected filter values
-                    if let Some(col) = k.strip_prefix("selected_")
-                        && col == column
-                        && !value.is_empty()
-                    {
-                        selected_values.push(value);
+                    // Collect currently selected filter values (for maintaining checkbox state)
+                    if let Some(col) = k.strip_prefix("selected_") {
+                        if col == column && !value.is_empty() {
+                            selected_values.push(value.clone());
+                        }
+                        // Also collect as filters to apply to the query
+                        if !value.is_empty() {
+                            filters.entry(col.to_string()).or_default().push(value);
+                        }
                     }
                 }
                 _ => {}
@@ -496,6 +555,7 @@ pub async fn get_column_values(
         PAGE_SIZE,
         offset,
         search.as_deref(),
+        &filters,
     )
     .await
     .unwrap();

@@ -433,6 +433,7 @@ pub async fn get_dyn_table(
 }
 
 /// Get distinct values for a specific column
+#[allow(clippy::too_many_arguments)]
 pub async fn get_distinct_column_values(
     config: &config::Server,
     database: &str,
@@ -441,17 +442,42 @@ pub async fn get_distinct_column_values(
     limit: usize,
     offset: usize,
     search: Option<&str>,
+    filters: &std::collections::HashMap<String, Vec<String>>,
 ) -> Result<DynTable, Box<dyn std::error::Error>> {
-    // Build WHERE clause for search filter if provided
-    let where_clause = if let Some(search_term) = search {
-        if !search_term.is_empty() {
-            let escaped = search_term.replace('\'', "\\'");
-            format!(" WHERE `{}` ILIKE '%{}%'", column, escaped)
-        } else {
-            String::new()
+    // Build WHERE clause from filters (excluding current column) and search
+    let mut conditions: Vec<String> = Vec::new();
+
+    // Add filters from other columns
+    for (col, values) in filters {
+        if col != column {
+            // Only apply filters from other columns
+            if values.len() == 1 {
+                // Single value: use exact match
+                let escaped_val = values[0].replace('\'', "\'\'");
+                conditions.push(format!("`{}` = '{}'", col, escaped_val));
+            } else if !values.is_empty() {
+                // Multiple values: use IN clause
+                let escaped_values: Vec<String> = values
+                    .iter()
+                    .map(|v| format!("'{}'", v.replace('\'', "\'\'")))
+                    .collect();
+                conditions.push(format!("`{}` IN ({})", col, escaped_values.join(", ")));
+            }
         }
-    } else {
+    }
+
+    // Add search filter if provided
+    if let Some(search_term) = search
+        && !search_term.is_empty()
+    {
+        let escaped = search_term.replace('\'', "\'\'");
+        conditions.push(format!("`{}` ILIKE '%{}%'", column, escaped));
+    }
+
+    let where_clause = if conditions.is_empty() {
         String::new()
+    } else {
+        format!(" WHERE {}", conditions.join(" AND "))
     };
 
     // Query for distinct values

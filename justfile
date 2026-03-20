@@ -19,6 +19,9 @@ up:
     just hurl test
     echo URL: http://localhost:8080
 
+down:
+    just docker stop
+
 verify:
     cargo fmt -- --check
     cargo check
